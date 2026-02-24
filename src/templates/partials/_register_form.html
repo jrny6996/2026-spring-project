@@ -1,0 +1,15 @@
+<form hx-post="/api/users" id="register" class="card card-body card-border bg-base-100 ">
+    <div class="mb-2 flex">
+        <span class="card-title  flex-1">
+            Register
+        </span>
+        <button type="button" hx-get="/login" hx-select="#login" hx-target="#register" hx-swap="outerHTML">Login</button>
+    </div>
+    <label for="" class="label">Email</label>
+    <input type="email" name="email" class="input w-full" required>
+    <label for="" class="label">Password</label>
+    <input type="password" name="password" id="" class="input w-full" required>
+    <label for="" class="label">Confirm Password</label>
+    <input type="password" name="password-confirm" id="" class="input w-full" required>
+    <input type="submit" value="Register" class="btn btn-primary">
+</form>

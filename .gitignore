@@ -1,0 +1,9 @@
+build/*
+
+node_modules/
+package-lock.json
+
+.env
+src/client_wasm/build
+
+.vscode

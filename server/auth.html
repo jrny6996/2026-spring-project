@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auth — register & login</title>
+    <style>
+        body { font-family: system-ui, sans-serif; max-width: 32rem; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+        h1 { font-size: 1.25rem; }
+        label { display: block; margin-top: 0.75rem; font-weight: 600; }
+        input { width: 100%; box-sizing: border-box; padding: 0.4rem 0.5rem; margin-top: 0.25rem; }
+        button { margin-top: 0.75rem; padding: 0.45rem 0.9rem; cursor: pointer; }
+        pre { background: #f4f4f5; padding: 0.75rem; overflow: auto; font-size: 0.85rem; border-radius: 4px; }
+        .muted { color: #555; font-size: 0.9rem; }
+        a { color: #2563eb; }
+    </style>
+</head>
+<body>
+    <p class="muted"><a href="/">← WebSocket demo</a></p>
+    <h1>Register & login</h1>
+    <p class="muted">Password must be at least 8 characters. Username: 3–32 letters, digits, or underscore.</p>
+
+    <label for="user">Username</label>
+    <input id="user" type="text" autocomplete="username" />
+
+    <label for="pass">Password</label>
+    <input id="pass" type="password" autocomplete="current-password" />
+
+    <div>
+        <button type="button" id="btnReg">Register</button>
+        <button type="button" id="btnLogin">Log in</button>
+        <button type="button" id="btnMe">Who am I?</button>
+        <button type="button" id="btnLogout">Clear token</button>
+    </div>
+
+    <p class="muted">Token is stored in <code>localStorage</code> as <code>jwt</code>.</p>
+    <pre id="out">(no response yet)</pre>
+
+    <script>
+        const user = () => document.getElementById("user").value.trim();
+        const pass = () => document.getElementById("pass").value;
+        const out = document.getElementById("out");
+        const tokenKey = "jwt";
+
+        function setOut(obj) {
+            out.textContent = typeof obj === "string" ? obj : JSON.stringify(obj, null, 2);
+        }
+
+        function getToken() {
+            return localStorage.getItem(tokenKey) || "";
+        }
+
+        function setToken(t) {
+            if (t) localStorage.setItem(tokenKey, t);
+            else localStorage.removeItem(tokenKey);
+        }
+
+        document.getElementById("btnReg").onclick = async () => {
+            const res = await fetch("/api/register", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ username: user(), password: pass() }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (res.ok && data.token) setToken(data.token);
+            setOut({ status: res.status, body: data });
+        };
+
+        document.getElementById("btnLogin").onclick = async () => {
+            const res = await fetch("/api/login", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ username: user(), password: pass() }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (res.ok && data.token) setToken(data.token);
+            setOut({ status: res.status, body: data });
+        };
+
+        document.getElementById("btnMe").onclick = async () => {
+            const t = getToken();
+            if (!t) {
+                setOut("No token in localStorage. Log in first.");
+                return;
+            }
+            const res = await fetch("/api/me", {
+                headers: { Authorization: "Bearer " + t },
+            });
+            const data = await res.json().catch(() => ({}));
+            setOut({ status: res.status, body: data });
+        };
+
+        document.getElementById("btnLogout").onclick = () => {
+            setToken(null);
+            setOut("Token cleared.");
+        };
+    </script>
+</body>
+</html>

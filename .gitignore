@@ -1,9 +1,5 @@
-build/*
-
+.vscode/
+build/
+dist/
 node_modules/
-package-lock.json
-
-.env
-src/client_wasm/build
-
-.vscode
+tmp/

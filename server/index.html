@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>WebSocket JSON Example</title>
+    </head>
+    <body>
+        <p><a href="/auth">Register / login</a></p>
+        <input id="input" type="text" placeholder="Enter message" />
+        <button onclick="send()">Send</button>
+        <br>
+        <input type="text" name="join" id="join" placeholder="join lobby">
+        <button onclick="join()">Join</button>
+
+        <pre id="output"></pre>
+
+        <script>
+            const input = document.getElementById("input");
+            const joinLobby = document.getElementById("join");
+            const output = document.getElementById("output");
+
+            // Connect to WebSocket
+            const socket = new WebSocket(
+                "ws://localhost:6789/echo",
+            );
+
+            // Connection opened
+            socket.onopen = () => {
+                output.innerHTML += "Status: Connected\n";
+            };
+
+            // Message received from server
+            socket.onmessage = (e) => {
+                try {
+                    // Parse JSON
+                    const data = JSON.parse(e.data);
+                    // Pretty-print JSON
+                    output.innerHTML += "Server JSON:\n" +
+                        JSON.stringify(data, null, 2) + "\n";
+                } catch (err) {
+                    // Fallback if not JSON
+                    output.innerHTML += "Server: " + e.data +
+                        "\n";
+                }
+            };
+
+            // Send JSON message
+            function join() {
+                const msg = {
+                    type: "join",
+                    content: joinLobby.value,
+                };
+                socket.send(JSON.stringify(msg));
+                joinLobby.value = "";
+            }
+            function send() {
+                const message = {
+                    type: "chat",
+                    content: input.value,
+                };
+                socket.send(JSON.stringify(message));
+                input.value = "";
+            }
+        </script>
+    </body>
+</html>

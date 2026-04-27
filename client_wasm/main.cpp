@@ -11,8 +11,8 @@
 #include "ws_init.hpp"
 
 // Globals
-int screenWidth = 1280;
-int screenHeight = 720;
+int screenWidth = GetMonitorWidth(0);
+int screenHeight =GetMonitorHeight(0);
 Camera3D camera = {0};
 Scene* curr_scene = init_menu(camera);
 Color bg_color = {0, 0, 10, 255};

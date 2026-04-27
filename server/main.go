@@ -141,7 +141,7 @@ func runSimStepTicker() {
 				continue
 			}
 			room.Time++
-			if true {
+			if false {
 				room.Sim.Step(lobbyID)
 			}
 			broadcastStateToLobby(lobbyID)

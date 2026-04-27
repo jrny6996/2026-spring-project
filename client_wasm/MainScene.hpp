@@ -38,6 +38,7 @@ class MainScene : public Scene {
       pbr_lights_[mainscene::kMaxPbrLights];
   int pbr_light_count_ = 0;
   std::map<std::string, TronicPositionMap> tronic_maps_;
+  bool debug_tronic_coords_ = false;
 
   void enable_pbr() {
     mainscene::setup_pbr_shader_locs(map_shader);
@@ -100,8 +101,13 @@ class MainScene : public Scene {
     preloader.EndServe();
 
     enable_pbr();
-    this->tronic_maps_ = create_tronic_positions(this->freddy, this->bonnie,
-                                                this->chica, this->foxy);
+    const TronicRosterSpec tronic_roster{
+        {this->freddy, {50.0f, 50.0f, 50.0f}, {1.0f, 0.0f, -4.0f}},
+        {this->bonnie, {0.045f, 0.045f, 0.045f}, {-4.15f, 0.0f, 0.35f}},
+        {this->chica, {0.068f, 0.068f, 0.068f}, {2.15f, 0.0f, 0.35f}},
+        {this->foxy, {0.048f, 0.048f, 0.048f}, {0.0f, 0.0f, -0.95f}},
+    };
+    this->tronic_maps_ = create_tronic_positions(tronic_roster);
     this->camera.fovy = 50.0f;
     this->camera.target.x = -1.0f;
     this->camera.target.z = 10.0f;
@@ -132,6 +138,8 @@ class MainScene : public Scene {
     mainscene::process_check_camera_restore(state, camera_nav_);
     mainscene::process_camera_panel_toggle(camera_nav_, state.is_player_one);
     mainscene::try_send_check_camera_room(state, camera_nav_, socket);
+    if (IsKeyPressed(KEY_L))
+      debug_tronic_coords_ = !debug_tronic_coords_;
 
     mainscene::clamp_and_apply_pbr_for_security_feed(
         state, camera_nav_, pbr_lights_, pbr_light_count_);
@@ -157,9 +165,12 @@ class MainScene : public Scene {
     BeginMode3D(this->camera);
     mainscene::draw_main_scene_3d(
         this->camera_nav_, state.is_player_one, state, animatronic_models,
-        this->freddyInitialPos, this->tronic_maps_, this->map, this->p_map);
+        this->freddyInitialPos, this->tronic_maps_, this->map, this->p_map,
+        debug_tronic_coords_);
     EndMode3D();
-    mainscene::draw_main_scene_2d(this->camera, camera_nav_, state);
+    mainscene::draw_main_scene_2d(this->camera, camera_nav_, state,
+                                    debug_tronic_coords_, this->tronic_maps_,
+                                    this->freddyInitialPos);
     EndDrawing();
   }
 

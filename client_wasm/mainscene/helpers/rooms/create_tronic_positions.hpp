@@ -4,6 +4,21 @@
 #include <string>
 #include "tronic_position_map.hpp"
 
+/// One animatronic mesh: model reference, draw scale, and per-character world nudge.
+struct TronicCharacterSpec {
+  const Model& model;
+  Vector3 scale;
+  Vector3 character_offset;
+};
+
+/// The four classic characters; toy entities reuse the same spec as their mesh.
+struct TronicRosterSpec {
+  TronicCharacterSpec freddy;
+  TronicCharacterSpec bonnie;
+  TronicCharacterSpec chica;
+  TronicCharacterSpec foxy;
+};
+
 /// Maps a live sim row to the tronic map key (freddy, bonnie, …). Lowercases
 /// the server `name` and falls back to `entityId` when the name is empty or not a
 /// known animatronic id.
@@ -92,18 +107,24 @@ inline TronicPositionMap make_tronic_layout(const Model& model) {
   return m;
 }
 
+inline TronicPositionMap make_tronic_map(const TronicCharacterSpec& spec) {
+  TronicPositionMap m = make_tronic_layout(spec.model);
+  m.scale = spec.scale;
+  m.character_offset = spec.character_offset;
+  return m;
+}
+
 /// Keys must match server entity `name` (see game.go / sim entities).
 inline std::map<std::string, TronicPositionMap> create_tronic_positions(
-    const Model& freddy, const Model& bonnie, const Model& chica,
-    const Model& foxy) {
+    const TronicRosterSpec& roster) {
   std::map<std::string, TronicPositionMap> out;
-  out.emplace("freddy", make_tronic_layout(freddy));
-  out.emplace("bonnie", make_tronic_layout(bonnie));
-  out.emplace("chica", make_tronic_layout(chica));
-  out.emplace("foxy", make_tronic_layout(foxy));
-  out.emplace("toy_freddy", make_tronic_layout(freddy));
-  out.emplace("toy_bonnie", make_tronic_layout(bonnie));
-  out.emplace("toy_chica", make_tronic_layout(chica));
-  out.emplace("toy_foxy", make_tronic_layout(foxy));
+  out.emplace("freddy", make_tronic_map(roster.freddy));
+  out.emplace("bonnie", make_tronic_map(roster.bonnie));
+  out.emplace("chica", make_tronic_map(roster.chica));
+  out.emplace("foxy", make_tronic_map(roster.foxy));
+  out.emplace("toy_freddy", make_tronic_map(roster.freddy));
+  out.emplace("toy_bonnie", make_tronic_map(roster.bonnie));
+  out.emplace("toy_chica", make_tronic_map(roster.chica));
+  out.emplace("toy_foxy", make_tronic_map(roster.foxy));
   return out;
 }

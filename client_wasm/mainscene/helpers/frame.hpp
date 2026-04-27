@@ -8,10 +8,11 @@
 #include "raylib.h"
 #include <emscripten/websocket.h>
 #include <cstddef>
+#include <cstdio>
 #include <map>
 #include <string>
 #include <vector>
-
+#include <iostream>
 namespace mainscene {
 
 inline void process_check_camera_restore(GameState& state,
@@ -126,12 +127,85 @@ inline void apply_security_feed_or_office_view(
 
 inline const TronicPosition* tronic_pos_for_room(const TronicPositionMap* tpm,
                                                  const std::string& room_key) {
-  if (!tpm || room_key.empty())
-    return nullptr;
+
+                                                  std::cout << "TRONIC foudn in room\n";
+  if (!tpm || room_key.empty()){
+    std::cout << "no room key on tronic position map\n";
+    return nullptr;}
   auto it = tpm->pos_map.find(room_key);
-  if (it == tpm->pos_map.end())
+  if (it == tpm->pos_map.end()){
+    std::cout << "position could not be found in tpm map\n";
     return nullptr;
+  }
+
+  std::cout << "IT found\n";
   return &it->second;
+}
+
+inline Vector3 tronic_draw_scale_for(
+    const std::map<std::string, TronicPositionMap>& tronic_by_entity,
+    const std::string& tkey, const Vector3& fallback_scale) {
+  auto it = tronic_by_entity.find(tkey);
+  if (it != tronic_by_entity.end())
+    return it->second.scale;
+  auto fb = tronic_by_entity.find("freddy");
+  if (fb != tronic_by_entity.end())
+    return fb->second.scale;
+  return fallback_scale;
+}
+
+inline std::map<std::string, int> tronic_room_occupancy(
+    const std::vector<SimEntityRow>& sim_entities, const char* only_room_alias) {
+  std::map<std::string, int> counts;
+  for (const auto& ent : sim_entities) {
+    if (tronic_key_from_sim_entity(ent.id, ent.name).empty())
+      continue;
+    if (only_room_alias) {
+      if (ent.room_alias != only_room_alias)
+        continue;
+    } else {
+      if (ent.room_alias.empty())
+        continue;
+    }
+    counts[ent.room_alias]++;
+  }
+  return counts;
+}
+
+/// Resolves world position / rotation for one sim animatronic (same rules as draw).
+/// Returns false when there is no layout entry and backups are disabled.
+inline bool resolve_tronic_draw_transform(
+    const SimEntityRow& ent,
+    const std::map<std::string, TronicPositionMap>& tronic_by_entity,
+    const Vector3& default_pos, const Vector3& default_axis,
+    bool use_backup_when_pos_missing, Vector3* out_pos, Vector3* out_axis,
+    float* out_angle) {
+  const std::string tkey = tronic_key_from_sim_entity(ent.id, ent.name);
+  if (tkey.empty())
+    return false;
+  const std::string ent_room =
+      tronic_3d_pos_key(ent.id, ent.room_alias.c_str());
+  const TronicPosition* tp = nullptr;
+  auto named = tronic_by_entity.find(tkey);
+  if (named != tronic_by_entity.end())
+    tp = tronic_pos_for_room(&named->second, ent_room);
+  if (!tp) {
+    auto fb = tronic_by_entity.find("freddy");
+    if (fb != tronic_by_entity.end())
+      tp = tronic_pos_for_room(&fb->second, ent_room);
+  }
+  if (!tp && !use_backup_when_pos_missing)
+    return false;
+  if (tp) {
+    *out_pos = tp->position;
+    *out_axis = tp->rotationAxis;
+    *out_angle = tp->rotationAngle;
+  } else {
+    *out_pos = default_pos;
+    *out_axis = default_axis;
+    *out_angle = 0.0f;
+  }
+  return true;
 }
 
 /// `only_room_alias`: if non-null, only draw entities in that sim room (security
@@ -146,7 +220,9 @@ inline std::size_t draw_tronic_sim_entities(
     const char* only_room_alias, bool use_backup_when_pos_missing) {
   if (animatronic_models.empty())
     return 0;
-  const Model& default_mesh = *animatronic_models[0];
+  const Model& default_mesh = *animatronic_models[1];
+  const std::map<std::string, int> occupancy =
+      tronic_room_occupancy(sim_entities, only_room_alias);
   std::size_t drawn = 0;
   for (const auto& ent : sim_entities) {
     const std::string tkey = tronic_key_from_sim_entity(ent.id, ent.name);
@@ -160,38 +236,97 @@ inline std::size_t draw_tronic_sim_entities(
         continue;
     }
     std::cout << ent.name << ent.room_alias<< "\n";
-    const std::string ent_room =
-        tronic_3d_pos_key(ent.id, ent.room_alias.c_str());
-    const TronicPosition* tp = nullptr;
-    auto named = tronic_by_entity.find(tkey);
-    if (named != tronic_by_entity.end())
-      tp = tronic_pos_for_room(&named->second, ent_room);
-    if (!tp) {
-      auto fb = tronic_by_entity.find("freddy");
-      if (fb != tronic_by_entity.end())
-        tp = tronic_pos_for_room(&fb->second, ent_room);
-    }
-    if (!tp && !use_backup_when_pos_missing)
+    Vector3 pos{};
+    Vector3 ax{};
+    float ang = 0.0f;
+    if (!resolve_tronic_draw_transform(ent, tronic_by_entity, default_pos,
+                                       rotation_axis, use_backup_when_pos_missing,
+                                       &pos, &ax, &ang))
       continue;
 
+    auto named = tronic_by_entity.find(tkey);
     const Model* mesh = &default_mesh;
+    Vector3 draw_scale = anim_scale;
+    Vector3 off{0.0f, 0.0f, 0.0f};
     if (named != tronic_by_entity.end()) {
       mesh = &named->second.model;
+      draw_scale = named->second.scale;
+      off = named->second.character_offset;
     } else {
       auto fb = tronic_by_entity.find("freddy");
-      if (fb != tronic_by_entity.end())
+      if (fb != tronic_by_entity.end()) {
         mesh = &fb->second.model;
+        draw_scale = fb->second.scale;
+        off = fb->second.character_offset;
+      }
     }
-    Vector3 pos = default_pos;
-    Vector3 ax = rotation_axis;
+    pos.x += off.x;
+    pos.y += off.y;
+    pos.z += off.z;
+    auto occ_it = occupancy.find(ent.room_alias);
+    if (occ_it != occupancy.end() && occ_it->second > 1) {
+      const float spread = 0.42f;
+      pos.x += static_cast<float>((ent.id % 5) - 2) * spread;
+    }
+
+    DrawModelEx(*mesh, pos, ax, ang, draw_scale, WHITE);
+    ++drawn;
+  }
+  return drawn;
+}
+
+/// Same entity set and `resolve_tronic_draw_transform` rules as the F3 coord HUD
+/// (backup layout, includes empty `room_alias`). Use so on-screen models match HUD.
+inline std::size_t draw_tronic_sim_entities_matching_debug_hud(
+    const std::vector<SimEntityRow>& sim_entities,
+    const std::map<std::string, TronicPositionMap>& tronic_by_entity,
+    const std::vector<Model*>& animatronic_models, const Vector3& default_pos,
+    const Vector3& rotation_axis, const Vector3& anim_scale) {
+  if (animatronic_models.empty())
+    return 0;
+  const Model& default_mesh = *animatronic_models[1];
+  const std::map<std::string, int> occupancy =
+      tronic_room_occupancy(sim_entities, nullptr);
+  std::size_t drawn = 0;
+  for (const auto& ent : sim_entities) {
+    const std::string tkey = tronic_key_from_sim_entity(ent.id, ent.name);
+    if (tkey.empty())
+      continue;
+    if (tkey == "freddy" || tkey == "toy_freddy")
+      continue;
+    Vector3 pos{};
+    Vector3 ax{};
     float ang = 0.0f;
-    if (tp) {
-      pos = tp->position;
-      ax = tp->rotationAxis;
-      ang = tp->rotationAngle;
+    if (!resolve_tronic_draw_transform(ent, tronic_by_entity, default_pos,
+                                       rotation_axis,
+                                       /*use_backup_when_pos_missing=*/true,
+                                       &pos, &ax, &ang))
+      continue;
+    auto named = tronic_by_entity.find(tkey);
+    const Model* mesh = &default_mesh;
+    Vector3 draw_scale = tronic_draw_scale_for(tronic_by_entity, tkey, anim_scale);
+    Vector3 off{0.0f, 0.0f, 0.0f};
+    if (named != tronic_by_entity.end()) {
+      mesh = &named->second.model;
+      draw_scale = named->second.scale;
+      off = named->second.character_offset;
+    } else {
+      auto fb = tronic_by_entity.find("freddy");
+      if (fb != tronic_by_entity.end()) {
+        mesh = &fb->second.model;
+        draw_scale = fb->second.scale;
+        off = fb->second.character_offset;
+      }
     }
-    pos.x += static_cast<float>((ent.id % 5) * 2 - 4) * 0.35f;
-    DrawModelEx(*mesh, pos, ax, ang, anim_scale, WHITE);
+    pos.x += off.x;
+    pos.y += off.y;
+    pos.z += off.z;
+    auto occ_it = occupancy.find(ent.room_alias);
+    if (occ_it != occupancy.end() && occ_it->second > 1) {
+      const float spread = 0.42f;
+      pos.x += static_cast<float>((ent.id % 5) - 2) * spread;
+    }
+    DrawModelEx(*mesh, pos, ax, ang, draw_scale, WHITE);
     ++drawn;
   }
   return drawn;
@@ -201,13 +336,14 @@ inline void draw_main_scene_3d(
     CameraNavState& camera_nav, bool is_player_one, const GameState& state,
     const std::vector<Model*>& animatronic_models, const Vector3& default_pos,
     const std::map<std::string, TronicPositionMap>& tronic_by_entity,
-    const Model& map, const Model& p_map) {
+    const Model& map, const Model& p_map, bool debug_tronic_coords) {
   const Vector3 rotationAxis = {0.0f, 1.0f, 0.0f};
-  const Vector3 anim_scale = {50.0f, 50.0f, 50.0f};
+  const Vector3 anim_scale = tronic_draw_scale_for(tronic_by_entity, "freddy",
+                                                   {0.05f, 0.05f, 0.05f});
 
   if (animatronic_models.empty())
     return;
-  const Model& default_mesh = *animatronic_models[0];
+  const Model& default_mesh = *animatronic_models[1];
 
   DrawModel(map, (Vector3){0.0f, 2.5f, -2.5f}, 1.0f, WHITE);
   DrawModel(p_map, (Vector3){1.0f, 50.0f, -13.0f}, 1.0f, WHITE);
@@ -215,15 +351,26 @@ inline void draw_main_scene_3d(
   const bool on_feed = camera_nav.active_feed >= 0;
   if (!on_feed || !state.gameStarted) {
     if (state.gameStarted && !state.sim_entities.empty()) {
-      if (draw_tronic_sim_entities(state.sim_entities, tronic_by_entity,
-                                    animatronic_models, default_pos, rotationAxis,
-                                    anim_scale, nullptr, false) == 0) {
+      std::size_t drawn = 0;
+      if (debug_tronic_coords) {
+        drawn = draw_tronic_sim_entities_matching_debug_hud(
+            state.sim_entities, tronic_by_entity, animatronic_models,
+            default_pos, rotationAxis, anim_scale);
+      } else {
+        drawn = draw_tronic_sim_entities(state.sim_entities, tronic_by_entity,
+                                         animatronic_models, default_pos,
+                                         rotationAxis, anim_scale, nullptr,
+                                         false);
+      }
+      if (drawn == 0) {
         DrawModelEx(default_mesh, default_pos, rotationAxis, 0.0f, anim_scale,
                     WHITE);
       }
     } else {
       DrawModelEx(default_mesh, default_pos, rotationAxis, 0.0f, anim_scale,
                   WHITE);
+
+                  
     }
     return;
   }
@@ -245,6 +392,16 @@ inline void draw_main_scene_3d(
     return;
   }
 
+  if (debug_tronic_coords && !state.sim_entities.empty()) {
+    if (draw_tronic_sim_entities_matching_debug_hud(
+            state.sim_entities, tronic_by_entity, animatronic_models,
+            default_pos, rotationAxis, anim_scale) == 0) {
+      DrawModelEx(default_mesh, default_pos, rotationAxis, 0.0f, anim_scale,
+                  WHITE);
+    }
+    return;
+  }
+
   bool any_in_room = false;
   for (const auto& ent : state.sim_entities) {
     if (ent.room_alias == sim_alias) {
@@ -261,8 +418,65 @@ inline void draw_main_scene_3d(
                             anim_scale, sim_alias, true);
 }
 
+inline void draw_tronic_coords_debug_hud(
+    const GameState& state,
+    const std::map<std::string, TronicPositionMap>& tronic_by_entity,
+    const Vector3& default_pos) {
+  if (!state.gameStarted || state.sim_entities.empty())
+    return;
+  const Vector3 default_axis = {0.0f, 1.0f, 0.0f};
+  int y = 140;
+  DrawText("Tronic world coords:", 10, y, 14, LIME);
+  y += 18;
+  char line[256];
+  const std::map<std::string, int> occupancy =
+      tronic_room_occupancy(state.sim_entities, nullptr);
+  for (const auto& ent : state.sim_entities) {
+    const std::string tkey = tronic_key_from_sim_entity(ent.id, ent.name);
+    if (tkey.empty())
+      continue;
+    Vector3 pos{};
+    Vector3 ax{};
+    float ang = 0.0f;
+    if (!resolve_tronic_draw_transform(ent, tronic_by_entity, default_pos,
+                                       default_axis,
+                                       /*use_backup_when_pos_missing=*/true,
+                                       &pos, &ax, &ang))
+      continue;
+    Vector3 off{0.0f, 0.0f, 0.0f};
+    auto named = tronic_by_entity.find(tkey);
+    if (named != tronic_by_entity.end())
+      off = named->second.character_offset;
+    else {
+      auto fb = tronic_by_entity.find("freddy");
+      if (fb != tronic_by_entity.end())
+        off = fb->second.character_offset;
+    }
+    pos.x += off.x;
+    pos.y += off.y;
+    pos.z += off.z;
+    auto occ_it = occupancy.find(ent.room_alias);
+    if (occ_it != occupancy.end() && occ_it->second > 1) {
+      const float spread = 0.42f;
+      pos.x += static_cast<float>((ent.id % 5) - 2) * spread;
+    }
+    std::snprintf(line, sizeof(line),
+                  "%s  [%s]  x=%.2f y=%.2f z=%.2f", ent.name.c_str(),
+                  ent.room_alias.c_str(), static_cast<double>(pos.x),
+                  static_cast<double>(pos.y), static_cast<double>(pos.z));
+    DrawText(line, 10, y, 14, RAYWHITE);
+    y += 16;
+    if (y > GetScreenHeight() - 80)
+      break;
+  }
+}
+
 inline void draw_main_scene_2d(Camera& camera, CameraNavState& camera_nav,
-                                 const GameState& state) {
+                               const GameState& state,
+                               bool show_tronic_coords_debug,
+                               const std::map<std::string, TronicPositionMap>&
+                                   tronic_by_entity,
+                               const Vector3& tronic_default_pos) {
   camera_nav.DrawPanel(state.is_player_one);
   std::string x_text = std::to_string(camera.position.x);
   std::string y_text = std::to_string(camera.position.y);
@@ -273,6 +487,9 @@ inline void draw_main_scene_2d(Camera& camera, CameraNavState& camera_nav,
   if (state.has_player_slot) {
     const char* label = state.is_player_one ? "Player 1" : "Player 2";
     DrawText(label, 10, 64, 16, WHITE);
+  }
+  if (show_tronic_coords_debug) {
+    draw_tronic_coords_debug_hud(state, tronic_by_entity, tronic_default_pos);
   }
   if (!state.check_camera_status.empty()) {
     const int hud_y = GetScreenHeight() - 48;
@@ -298,6 +515,8 @@ inline void draw_main_scene_2d(Camera& camera, CameraNavState& camera_nav,
   }
   DrawText("Cam feed: C = entities in this cam room (after start)", 10, 100,
            16, Fade(LIGHTGRAY, 0.85f));
+  DrawText("F3 = toggle tronic x,y,z (after start)", 10, 118, 14,
+           Fade(LIGHTGRAY, 0.75f));
 }
 
 }  // namespace mainscene

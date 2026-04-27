@@ -19,7 +19,10 @@ class TronicPositionWithKeys {
 };
 class TronicPositionMap {
  public:
-  Vector3 scale{50.0f, 50.0f, 50.0f};
+  /// Draw scale for this GLB (map geometry uses 1.0; each rip uses different units).
+  Vector3 scale{0.05f, 0.05f, 0.05f};
+  /// Added to every layout position so characters on the same slot do not sit in one spot.
+  Vector3 character_offset{0.0f, 0.0f, 0.0f};
   Color tint{WHITE};
   const Model& model;
   std::map<std::string, TronicPosition> pos_map{};

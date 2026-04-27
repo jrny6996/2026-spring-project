@@ -284,7 +284,8 @@ inline const SecurityCamera* MapForPlayer(bool is_player_one, int* count) {
   return kPlayerTwo;
 }
 
-// kInitSpotOrder spotlights: PbrLightId indices 7..22; hall A/D spots are 23..24 in MainScene.
+// kInitSpotOrder spotlights: PbrLightId indices 7..22; hall A/D spots are 23..24
+// (see mainscene::init_all_scene_pbr_lights).
 inline constexpr SecurityCamera kInitSpotOrder[] = {
     kPlayerOne[0], kPlayerOne[1], kPlayerTwo[0], kPlayerTwo[1], kPlayerOne[4],
     kPlayerOne[5], kPlayerOne[6], kPlayerOne[7], kPlayerOne[2], kPlayerOne[3],

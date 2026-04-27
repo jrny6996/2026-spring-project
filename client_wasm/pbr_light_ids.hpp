@@ -1,6 +1,7 @@
 #pragma once
 
-// Registration order must match init_pbr_light / init_pbr_spot_light in MainScene.
+// Registration order must match mainscene::init_all_scene_pbr_lights in
+// mainscene/helpers/pbr_lights.hpp.
 enum class PbrLightId : int {
   PlayerFollow = 0,
   FirstFloorOrange = 1,

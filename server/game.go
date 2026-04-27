@@ -270,6 +270,32 @@ func (gs *GameState) Step(lobbyID string) {
 		gs.CheckEntityInPlayerRoom(id, lobbyID)
 	}
 }
+
+// nameForEntityID returns the sim animatronic key used by clients (tronic map + mesh).
+// Used when a node's Entities slice is missing the id (should be rare); keeps wire names stable.
+func nameForEntityID(id int16) string {
+	switch id {
+	case 1:
+		return "freddy"
+	case 2:
+		return "bonnie"
+	case 3:
+		return "chica"
+	case 4:
+		return "foxy"
+	case 11:
+		return "toy_freddy"
+	case 12:
+		return "toy_bonnie"
+	case 13:
+		return "toy_chica"
+	case 14:
+		return "toy_foxy"
+	default:
+		return ""
+	}
+}
+
 // SnapshotSimEntities builds the list of animatronics and their room aliases for clients.
 func (gs *GameState) SnapshotSimEntities() []SimEntityWire {
 	if gs == nil || gs.Tracker == nil {
@@ -283,6 +309,9 @@ func (gs *GameState) SnapshotSimEntities() []SimEntityWire {
 				name = e.Name
 				break
 			}
+		}
+		if name == "" {
+			name = nameForEntityID(id)
 		}
 		out = append(out, SimEntityWire{
 			EntityID:  id,

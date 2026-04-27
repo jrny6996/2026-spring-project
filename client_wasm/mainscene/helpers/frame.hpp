@@ -7,8 +7,10 @@
 #include "rooms/create_tronic_positions.hpp"
 #include "raylib.h"
 #include <emscripten/websocket.h>
+#include <cstddef>
 #include <map>
 #include <string>
+#include <vector>
 
 namespace mainscene {
 
@@ -132,22 +134,97 @@ inline const TronicPosition* tronic_pos_for_room(const TronicPositionMap* tpm,
   return &it->second;
 }
 
-inline void draw_main_scene_3d(CameraNavState& camera_nav, bool is_player_one,
-                              const GameState& state, const Model& freddy,
-                              const Vector3& freddy_backup_pos,
-                              const std::map<std::string, TronicPositionMap>&
-                                  tronic_by_entity,
-                              const Model& map, const Model& p_map) {
+/// `only_room_alias`: if non-null, only draw entities in that sim room (security
+/// feed). If null, draw every entity that has a mapped 3D position (world / office
+/// view). `use_backup_when_pos_missing` matches the feed: still draw at backup pos
+/// when the room is not in the tronic table.
+inline std::size_t draw_tronic_sim_entities(
+    const std::vector<SimEntityRow>& sim_entities,
+    const std::map<std::string, TronicPositionMap>& tronic_by_entity,
+    const std::vector<Model*>& animatronic_models, const Vector3& default_pos,
+    const Vector3& rotation_axis, const Vector3& anim_scale,
+    const char* only_room_alias, bool use_backup_when_pos_missing) {
+  if (animatronic_models.empty())
+    return 0;
+  const Model& default_mesh = *animatronic_models[0];
+  std::size_t drawn = 0;
+  for (const auto& ent : sim_entities) {
+    const std::string tkey = tronic_key_from_sim_entity(ent.id, ent.name);
+    if (tkey.empty())
+      continue;
+    if (only_room_alias) {
+      if (ent.room_alias != only_room_alias)
+        continue;
+    } else {
+      if (ent.room_alias.empty())
+        continue;
+    }
+    std::cout << ent.name << ent.room_alias<< "\n";
+    const std::string ent_room =
+        tronic_3d_pos_key(ent.id, ent.room_alias.c_str());
+    const TronicPosition* tp = nullptr;
+    auto named = tronic_by_entity.find(tkey);
+    if (named != tronic_by_entity.end())
+      tp = tronic_pos_for_room(&named->second, ent_room);
+    if (!tp) {
+      auto fb = tronic_by_entity.find("freddy");
+      if (fb != tronic_by_entity.end())
+        tp = tronic_pos_for_room(&fb->second, ent_room);
+    }
+    if (!tp && !use_backup_when_pos_missing)
+      continue;
+
+    const Model* mesh = &default_mesh;
+    if (named != tronic_by_entity.end()) {
+      mesh = &named->second.model;
+    } else {
+      auto fb = tronic_by_entity.find("freddy");
+      if (fb != tronic_by_entity.end())
+        mesh = &fb->second.model;
+    }
+    Vector3 pos = default_pos;
+    Vector3 ax = rotation_axis;
+    float ang = 0.0f;
+    if (tp) {
+      pos = tp->position;
+      ax = tp->rotationAxis;
+      ang = tp->rotationAngle;
+    }
+    pos.x += static_cast<float>((ent.id % 5) * 2 - 4) * 0.35f;
+    DrawModelEx(*mesh, pos, ax, ang, anim_scale, WHITE);
+    ++drawn;
+  }
+  return drawn;
+}
+
+inline void draw_main_scene_3d(
+    CameraNavState& camera_nav, bool is_player_one, const GameState& state,
+    const std::vector<Model*>& animatronic_models, const Vector3& default_pos,
+    const std::map<std::string, TronicPositionMap>& tronic_by_entity,
+    const Model& map, const Model& p_map) {
   const Vector3 rotationAxis = {0.0f, 1.0f, 0.0f};
   const Vector3 anim_scale = {50.0f, 50.0f, 50.0f};
+
+  if (animatronic_models.empty())
+    return;
+  const Model& default_mesh = *animatronic_models[0];
 
   DrawModel(map, (Vector3){0.0f, 2.5f, -2.5f}, 1.0f, WHITE);
   DrawModel(p_map, (Vector3){1.0f, 50.0f, -13.0f}, 1.0f, WHITE);
 
   const bool on_feed = camera_nav.active_feed >= 0;
   if (!on_feed || !state.gameStarted) {
-    DrawModelEx(freddy, freddy_backup_pos, rotationAxis, 0.0f, anim_scale,
-                WHITE);
+    if (state.gameStarted && !state.sim_entities.empty()) {
+      if (draw_tronic_sim_entities(state.sim_entities, tronic_by_entity,
+                                    animatronic_models, default_pos, rotationAxis,
+                                    anim_scale, nullptr, false) == 0) {
+        DrawModelEx(default_mesh, default_pos, rotationAxis, 0.0f, anim_scale,
+                    WHITE);
+      }
+    } else {
+      DrawModelEx(default_mesh, default_pos, rotationAxis, 0.0f, anim_scale,
+                  WHITE);
+    }
     return;
   }
 
@@ -155,7 +232,7 @@ inline void draw_main_scene_3d(CameraNavState& camera_nav, bool is_player_one,
   const SecurityCamera* cams =
       CameraMaps::MapForPlayer(is_player_one, &n_cams);
   if (camera_nav.active_feed >= n_cams || n_cams == 0) {
-    DrawModelEx(freddy, freddy_backup_pos, rotationAxis, 0.0f, anim_scale,
+    DrawModelEx(default_mesh, default_pos, rotationAxis, 0.0f, anim_scale,
                 WHITE);
     return;
   }
@@ -163,12 +240,10 @@ inline void draw_main_scene_3d(CameraNavState& camera_nav, bool is_player_one,
   const SecurityCamera& sc = cams[camera_nav.active_feed];
   const char* sim_alias = sc.sim_room_alias;
   if (!sim_alias || sim_alias[0] == '\0') {
-    DrawModelEx(freddy, freddy_backup_pos, rotationAxis, 0.0f, anim_scale,
+    DrawModelEx(default_mesh, default_pos, rotationAxis, 0.0f, anim_scale,
                 WHITE);
     return;
   }
-
-  const std::string room_key = tronic_room_key(is_player_one, sim_alias);
 
   bool any_in_room = false;
   for (const auto& ent : state.sim_entities) {
@@ -181,29 +256,9 @@ inline void draw_main_scene_3d(CameraNavState& camera_nav, bool is_player_one,
     return;
   }
 
-  for (const auto& ent : state.sim_entities) {
-    if (ent.room_alias != sim_alias)
-      continue;
-    const TronicPosition* tp = nullptr;
-    auto named = tronic_by_entity.find(ent.name);
-    if (named != tronic_by_entity.end())
-      tp = tronic_pos_for_room(&named->second, room_key);
-    if (!tp) {
-      auto fb = tronic_by_entity.find("freddy");
-      if (fb != tronic_by_entity.end())
-        tp = tronic_pos_for_room(&fb->second, room_key);
-    }
-    Vector3 pos = freddy_backup_pos;
-    Vector3 ax = rotationAxis;
-    float ang = 0.0f;
-    if (tp) {
-      pos = tp->position;
-      ax = tp->rotationAxis;
-      ang = tp->rotationAngle;
-    }
-    pos.x += static_cast<float>((ent.id % 5) * 2 - 4) * 0.35f;
-    DrawModelEx(freddy, pos, ax, ang, anim_scale, WHITE);
-  }
+  draw_tronic_sim_entities(state.sim_entities, tronic_by_entity,
+                            animatronic_models, default_pos, rotationAxis,
+                            anim_scale, sim_alias, true);
 }
 
 inline void draw_main_scene_2d(Camera& camera, CameraNavState& camera_nav,

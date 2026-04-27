@@ -141,7 +141,9 @@ func runSimStepTicker() {
 				continue
 			}
 			room.Time++
-			room.Sim.Step(lobbyID)
+			if true {
+				room.Sim.Step(lobbyID)
+			}
 			broadcastStateToLobby(lobbyID)
 			if int(room.Time) > NIGHT_IN_MINUTES*60 {
 				toEnd = append(toEnd, lobbyID)

@@ -170,7 +170,12 @@ inline EM_BOOL on_message(int, const EmscriptenWebSocketMessageEvent* e,
             state->sim_entities.clear();
             for (const auto& item : data["simEntities"]) {
               SimEntityRow row;
-              row.id = item.value("entityId", 0);
+              if (item.contains("entityId") && item["entityId"].is_number()) {
+                if (item["entityId"].is_number_integer())
+                  row.id = item["entityId"].get<int>();
+                else
+                  row.id = static_cast<int>(item["entityId"].get<double>());
+              }
               row.name = item.value("name", std::string());
               row.room_alias = item.value("roomAlias", std::string());
               state->sim_entities.push_back(std::move(row));

@@ -309,8 +309,10 @@ struct CameraNavState {
   bool panel_open = false;
   /// -1 = gameplay; else index into the active player's CameraMaps table.
   int active_feed = -1;
-  int last_feed_p1 = 0;
-  int last_feed_p2 = 0;
+  /// Default to Stage feeds so a newly opened camera panel is not on an empty
+  /// room (1F: kPlayerOne[5] Stage, 2F: kPlayerTwo[7] 2F Stage / toy_line).
+  int last_feed_p1 = 5;
+  int last_feed_p2 = 7;
 
   int& LastFeedSlot(bool is_player_one) {
     return is_player_one ? last_feed_p1 : last_feed_p2;

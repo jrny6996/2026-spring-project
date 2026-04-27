@@ -15,6 +15,7 @@
 #include "mainscene/helpers/pbr_lights.hpp"
 #include "mainscene/helpers/rooms/create_tronic_positions.hpp"
 #include "ws_init.hpp"
+#include <vector>
 Vector3 camPos = {0.0f, 5.0f, 0.0f};
 float yaw = PI;
 float pitch = 0.0f;
@@ -25,6 +26,9 @@ class MainScene : public Scene {
   Model map;
   Model p_map;
   Model freddy;
+  Model bonnie;
+  Model chica;
+  Model foxy;
   Vector3 freddyInitialPos;
   Camera& camera;
   Shader map_shader;
@@ -43,6 +47,9 @@ class MainScene : public Scene {
     mainscene::assign_pbr_to_model(map_shader, map);
     mainscene::assign_pbr_to_model(map_shader, p_map);
     mainscene::assign_pbr_to_model(map_shader, freddy);
+    mainscene::assign_pbr_to_model(map_shader, bonnie);
+    mainscene::assign_pbr_to_model(map_shader, chica);
+    mainscene::assign_pbr_to_model(map_shader, foxy);
   }
 
  public:
@@ -51,17 +58,26 @@ class MainScene : public Scene {
 
     static constexpr const char* kFreddyPath =
         "assets/freddy_fazbear_from_fnaf_help_wanted.glb";
+    static constexpr const char* kBonniePath =
+        "assets/fnaf_1_bonnie_by_thudner.glb";
+    static constexpr const char* kChicaPath = "assets/chica.glb";
+    static constexpr const char* kFoxyPath =
+        "assets/rynfox_fnaf_1_foxy_v6.glb";
     static constexpr const char* kMap1Path = "assets/fnaf_1_hw_map.glb";
     static constexpr const char* kMap2Path = "assets/fnaf_2_hw_map_updated.glb";
     static constexpr const char* kPbrVsPath = "assets/shaders/glsl100/pbr.vs";
     static constexpr const char* kPbrFsPath = "assets/shaders/glsl100/pbr.fs";
 
     SceneAssetPreloader preloader;
-    preloader.PreloadAll({kFreddyPath, kMap1Path, kMap2Path},
+    preloader.PreloadAll({kFreddyPath, kBonniePath, kChicaPath, kFoxyPath,
+                          kMap1Path, kMap2Path},
                          {kPbrVsPath, kPbrFsPath});
     preloader.BeginServe();
 
     this->freddy = LoadModel(kFreddyPath);
+    this->bonnie = LoadModel(kBonniePath);
+    this->chica = LoadModel(kChicaPath);
+    this->foxy = LoadModel(kFoxyPath);
     this->map = LoadModel(kMap1Path);
     this->p_map = LoadModel(kMap2Path);
     for (int i = 0; i < this->map.materialCount; i++) {
@@ -84,7 +100,8 @@ class MainScene : public Scene {
     preloader.EndServe();
 
     enable_pbr();
-    this->tronic_maps_ = create_tronic_positions(this->freddy);
+    this->tronic_maps_ = create_tronic_positions(this->freddy, this->bonnie,
+                                                this->chica, this->foxy);
     this->camera.fovy = 50.0f;
     this->camera.target.x = -1.0f;
     this->camera.target.z = 10.0f;
@@ -134,11 +151,13 @@ class MainScene : public Scene {
 
     mainscene::sync_pbr_shader_frame(map_shader, camera, pbr_lights_,
                                      pbr_light_count_, camPos);
+    const std::vector<Model*> animatronic_models = {&this->freddy, &this->bonnie,
+                                                    &this->chica, &this->foxy};
     BeginDrawing();
     BeginMode3D(this->camera);
-    mainscene::draw_main_scene_3d(this->camera_nav_, state.is_player_one, state,
-                                  this->freddy, this->freddyInitialPos,
-                                  this->tronic_maps_, this->map, this->p_map);
+    mainscene::draw_main_scene_3d(
+        this->camera_nav_, state.is_player_one, state, animatronic_models,
+        this->freddyInitialPos, this->tronic_maps_, this->map, this->p_map);
     EndMode3D();
     mainscene::draw_main_scene_2d(this->camera, camera_nav_, state);
     EndDrawing();

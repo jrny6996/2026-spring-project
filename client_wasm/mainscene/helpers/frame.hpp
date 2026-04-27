@@ -40,6 +40,7 @@ inline void try_send_check_camera_room(GameState& state,
       state.check_camera_status = "Checking cameras…";
       state.check_camera_saved_active_feed = camera_nav.active_feed;
       camera_nav.active_feed = -1;
+      state.check_camera_suspend_feed_for_request = true;
       state.check_camera_in_flight = true;
       ws::send_check_camera(socket, cams[idx].sim_room_alias);
     }

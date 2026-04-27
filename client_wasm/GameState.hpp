@@ -40,6 +40,10 @@ class GameState {
   bool check_camera_in_flight = false;
   bool check_camera_restore_feed = false;
   int check_camera_saved_active_feed = -1;
+  /// True when the in-flight check was from the C key (suspend feed until reply).
+  bool check_camera_suspend_feed_for_request = false;
+  /// Last `roomAlias` from a checkCamera or state payload.
+  std::string check_camera_last_room_alias;
 
   void printState() const {
     printf("Lobby: %s, Started: %s, Time: %d\n", lobbyId.c_str(),

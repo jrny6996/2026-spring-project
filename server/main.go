@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"net/http"
 	"strings"
+	"sync"
 	"text/template"
 	"time"
 
@@ -22,7 +23,11 @@ var upgrader = websocket.Upgrader{
 }
 
 type UserWsConnection struct {
-	LobbyID string `json:"lobbyId"`
+	LobbyID string
+	// Remote is r.RemoteAddr for this connection (string); used in stateForClient.
+	Remote  string
+	Conn    *websocket.Conn
+	WriteMu sync.Mutex
 }
 
 type Room struct {
@@ -51,12 +56,13 @@ type SimEntityWire struct {
 // gameStateWire is the JSON sent to a single client (includes per-client isPlayerOne).
 type gameStateWire struct {
 	GameRoomState
+	LobbyID     string          `json:"lobbyId"`
 	IsPlayerOne bool            `json:"isPlayerOne"`
 	SimEntities []SimEntityWire `json:"simEntities,omitempty"`
 }
 
-func stateForClient(room *GameRoomState, remoteAddr string) gameStateWire {
-	w := gameStateWire{GameRoomState: *room}
+func stateForClient(room *GameRoomState, remoteAddr, lobbyID string) gameStateWire {
+	w := gameStateWire{GameRoomState: *room, LobbyID: lobbyID}
 	switch remoteAddr {
 	case room.Host:
 		w.IsPlayerOne = room.HostIsPlayerOne
@@ -81,30 +87,68 @@ const NIGHT_IN_MINUTES = 99
 var connectedUsersSet = make(map[string]*UserWsConnection)
 var lobbySet = make(map[string]*GameRoomState)
 
-func writeJSON(conn *websocket.Conn, t string, data interface{}) {
-	_ = conn.WriteJSON(Message{
-		Type: t,
-		Data: data,
-	})
+func writeJSONToUser(u *UserWsConnection, t string, data interface{}) {
+	if u == nil || u.Conn == nil {
+		return
+	}
+	u.WriteMu.Lock()
+	defer u.WriteMu.Unlock()
+	_ = u.Conn.WriteJSON(Message{Type: t, Data: data})
 }
 
-// runSimStepTicker advances night time and the entity sim once per second for
-// every started lobby (not tied to which client owns the WebSocket).
+// broadcastStateToLobby pushes sim/night time only to WebSockets in that lobby
+// (after a sim step).
+func broadcastStateToLobby(lobbyID string) {
+	room, ok := lobbySet[lobbyID]
+	if !ok || !room.Started {
+		return
+	}
+	for _, u := range connectedUsersSet {
+		if u == nil || u.LobbyID != lobbyID || u.Conn == nil {
+			continue
+		}
+		writeJSONToUser(u, "state", stateForClient(room, u.Remote, lobbyID))
+	}
+}
+
+func handleNightEnd(lobbyID string) {
+	var batch []*UserWsConnection
+	for _, u := range connectedUsersSet {
+		if u == nil || u.LobbyID != lobbyID || u.Conn == nil {
+			continue
+		}
+		batch = append(batch, u)
+	}
+	for _, u := range batch {
+		u.WriteMu.Lock()
+		_ = u.Conn.WriteJSON(Message{Type: "status", Data: "win"})
+		_ = u.Conn.Close()
+		u.Conn = nil
+		u.WriteMu.Unlock()
+	}
+	cleanupLobby(lobbyID)
+}
+
+// runSimStepTicker advances night time and the sim for each started lobby
+// on a single shared interval (one tick every 10s; each lobby has its own room).
 func runSimStepTicker() {
-	ticker := time.NewTicker(time.Second * 10)
+	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
-	var inter = 0
 	for range ticker.C {
+		var toEnd []string
 		for lobbyID, room := range lobbySet {
 			if room == nil || !room.Started || room.Sim == nil {
 				continue
 			}
 			room.Time++
-			fmt.Printf(lobbyID)
-			if true {
-				// room.Sim.Step(lobbyID)
-				inter++
+			room.Sim.Step(lobbyID)
+			broadcastStateToLobby(lobbyID)
+			if int(room.Time) > NIGHT_IN_MINUTES*60 {
+				toEnd = append(toEnd, lobbyID)
 			}
+		}
+		for _, id := range toEnd {
+			handleNightEnd(id)
 		}
 	}
 }
@@ -140,43 +184,38 @@ func main() {
 		}
 		defer conn.Close()
 
-		if _, exists := connectedUsersSet[r.RemoteAddr]; !exists {
-			connectedUsersSet[r.RemoteAddr] = &UserWsConnection{LobbyID: ""}
+		addr := r.RemoteAddr
+		if _, exists := connectedUsersSet[addr]; !exists {
+			connectedUsersSet[addr] = &UserWsConnection{Remote: addr}
 		}
+		user := connectedUsersSet[addr]
+		user.Conn = conn
 
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		go func(ctx context.Context) {
-			ticker := time.NewTicker(time.Second)
-			defer ticker.Stop()
-
+		// Keepalive only when this socket is not in a lobby. Game state is pushed
+		// from runSimStepTicker (lobby-scoped) after each sim step.
+		go func() {
+			ping := time.NewTicker(30 * time.Second)
+			defer ping.Stop()
 			for {
 				select {
-				case <-ticker.C:
-					user := connectedUsersSet[r.RemoteAddr]
-					room, exists := lobbySet[user.LobbyID]
-
-					if exists {
-						if room.Started {
-							writeJSON(conn, "state", stateForClient(room, r.RemoteAddr))
-						}
-
-						if room.Time > NIGHT_IN_MINUTES*60 {
-							writeJSON(conn, "status", "win")
-							cleanupLobby(user.LobbyID)
-							conn.Close()
-							return
-						}
-					} else {
-						writeJSON(conn, "ping", "ping")
+				case <-ping.C:
+					u := connectedUsersSet[addr]
+					if u == nil || u.Conn == nil {
+						return
 					}
-
+					_, inLobby := lobbySet[u.LobbyID]
+					if inLobby {
+						continue
+					}
+					writeJSONToUser(u, "ping", "ping")
 				case <-ctx.Done():
 					return
 				}
 			}
-		}(ctx)
+		}()
 
 		for {
 			_, msg, err := conn.ReadMessage()
@@ -190,7 +229,7 @@ func main() {
 			}
 
 			if err := json.Unmarshal(msg, &msgJson); err != nil {
-				writeJSON(conn, "error", "invalid-json")
+				writeJSONToUser(connectedUsersSet[addr], "error", "invalid-json")
 				continue
 			}
 
@@ -213,7 +252,7 @@ func main() {
 				}
 
 			default:
-				writeJSON(conn, "error", "unknown-type")
+				writeJSONToUser(connectedUsersSet[addr], "error", "unknown-type")
 			}
 		}
 	})
@@ -243,17 +282,17 @@ func handleCheckCamera(conn *websocket.Conn, r *http.Request, content string) {
 	user := connectedUsersSet[r.RemoteAddr]
 	room, ok := lobbySet[user.LobbyID]
 	if !ok || room.Sim == nil {
-		writeJSON(conn, "error", "game-not-started")
+		writeJSONToUser(user, "error", "game-not-started")
 		return
 	}
 	alias := strings.TrimSpace(content)
 	if alias == "" {
-		writeJSON(conn, "error", "bad-room-alias")
+		writeJSONToUser(user, "error", "bad-room-alias")
 		return
 	}
 	node := room.Sim.FindNodeByAlias(alias)
 	if node == nil {
-		writeJSON(conn, "error", "unknown-room")
+		writeJSONToUser(user, "error", "unknown-room")
 		return
 	}
 	type entWire struct {
@@ -264,7 +303,7 @@ func handleCheckCamera(conn *websocket.Conn, r *http.Request, content string) {
 	for _, e := range node.Entities {
 		list = append(list, entWire{EntityID: e.Id, Name: e.Name})
 	}
-	writeJSON(conn, "checkCamera", map[string]interface{}{
+	writeJSONToUser(user, "checkCamera", map[string]interface{}{
 		"roomAlias": alias,
 		"entities":  list,
 	})
@@ -276,10 +315,10 @@ func handleInvite(conn *websocket.Conn, r *http.Request) {
 	if user.LobbyID != "" {
 		room := lobbySet[user.LobbyID]
 		if room.Host == r.RemoteAddr {
-			writeJSON(conn, "invite", user.LobbyID)
+			writeJSONToUser(user, "invite", user.LobbyID)
 			return
 		}
-		writeJSON(conn, "error", "not-host")
+		writeJSONToUser(user, "error", "not-host")
 		return
 	}
 
@@ -289,18 +328,18 @@ func handleInvite(conn *websocket.Conn, r *http.Request) {
 	lobbySet[id] = &game
 	user.LobbyID = id
 
-	writeJSON(conn, "invite", id)
+	writeJSONToUser(user, "invite", id)
 }
 
 func handleJoin(conn *websocket.Conn, r *http.Request, lobbyID string) {
 	room, exists := lobbySet[lobbyID]
 	if !exists {
-		writeJSON(conn, "error", "lobby-not-found")
+		writeJSONToUser(connectedUsersSet[r.RemoteAddr], "error", "lobby-not-found")
 		return
 	}
 
 	if room.Accepted || room.Host == r.RemoteAddr {
-		writeJSON(conn, "error", "lobby-full")
+		writeJSONToUser(connectedUsersSet[r.RemoteAddr], "error", "lobby-full")
 		return
 	}
 
@@ -310,7 +349,7 @@ func handleJoin(conn *websocket.Conn, r *http.Request, lobbyID string) {
 	room.Accepted = true
 	room.Acceptor = r.RemoteAddr
 
-	writeJSON(conn, "joined", lobbyID)
+	writeJSONToUser(user, "joined", lobbyID)
 }
 
 func handleStartGame(conn *websocket.Conn, r *http.Request) {
@@ -318,12 +357,12 @@ func handleStartGame(conn *websocket.Conn, r *http.Request) {
 	room, exists := lobbySet[user.LobbyID]
 
 	if !exists {
-		writeJSON(conn, "error", "no-lobby")
+		writeJSONToUser(user, "error", "no-lobby")
 		return
 	}
 
 	if room.Host != r.RemoteAddr {
-		writeJSON(conn, "error", "not-host")
+		writeJSONToUser(user, "error", "not-host")
 		return
 	}
 
@@ -332,7 +371,7 @@ func handleStartGame(conn *websocket.Conn, r *http.Request) {
 	room.Sim = NewGameState()
 	room.Sim.SpawnEntities()
 	log.Printf("lobby %s: SpawnEntities done, sim ready", user.LobbyID)
-	writeJSON(conn, "state", stateForClient(room, r.RemoteAddr))
+	writeJSONToUser(user, "state", stateForClient(room, r.RemoteAddr, user.LobbyID))
 }
 
 func cleanupLobby(lobbyID string) {

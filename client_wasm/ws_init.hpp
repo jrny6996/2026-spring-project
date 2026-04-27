@@ -106,7 +106,9 @@ inline EM_BOOL on_message(int, const EmscriptenWebSocketMessageEvent* e,
               detail.empty() ? "Camera check failed"
                              : ("Camera check failed: " + detail);
           state->check_camera_in_flight = false;
-          state->check_camera_restore_feed = true;
+          state->check_camera_restore_feed =
+              state->check_camera_suspend_feed_for_request;
+          state->check_camera_suspend_feed_for_request = false;
         } else if (!detail.empty()) {
           state->menu_error = detail;
           state->menu_creating_lobby = false;
@@ -114,54 +116,69 @@ inline EM_BOOL on_message(int, const EmscriptenWebSocketMessageEvent* e,
       }
       if (parsed.contains("type") && parsed["type"] == "checkCamera" &&
           parsed.contains("data") && parsed["data"].is_object()) {
-        if (state->check_camera_in_flight) {
-          auto& d = parsed["data"];
-          const std::string alias = d.value("roomAlias", std::string());
-          state->check_camera_entities.clear();
-          if (d.contains("entities") && d["entities"].is_array()) {
-            for (const auto& item : d["entities"]) {
-              CheckCameraEntityRow row;
-              row.id = item.value("entityId", 0);
-              row.name = item.value("name", std::string());
-              state->check_camera_entities.push_back(std::move(row));
+        auto& d = parsed["data"];
+        const std::string alias = d.value("roomAlias", std::string());
+        state->check_camera_last_room_alias = alias;
+        state->check_camera_entities.clear();
+        if (d.contains("entities") && d["entities"].is_array()) {
+          for (const auto& item : d["entities"]) {
+            if (!item.is_object())
+              continue;
+            CheckCameraEntityRow row;
+            if (item.contains("entityId") && item["entityId"].is_number()) {
+              if (item["entityId"].is_number_integer())
+                row.id = item["entityId"].get<int>();
+              else
+                row.id = static_cast<int>(item["entityId"].get<double>());
             }
+            row.name = item.value("name", std::string());
+            state->check_camera_entities.push_back(std::move(row));
           }
-          state->check_camera_status =
-              alias.empty()
-                  ? "Camera room scan"
-                  : (alias + " — " +
-                     std::to_string(state->check_camera_entities.size()) + " ent.");
-          state->check_camera_in_flight = false;
-          state->check_camera_restore_feed = true;
         }
+        state->check_camera_status =
+            alias.empty()
+                ? "Camera room scan"
+                : (alias + " — " +
+                   std::to_string(state->check_camera_entities.size()) + " ent.");
+        state->check_camera_in_flight = false;
+        state->check_camera_restore_feed =
+            state->check_camera_suspend_feed_for_request;
+        state->check_camera_suspend_feed_for_request = false;
       }
       if (parsed["type"] == "state" && parsed.contains("data") &&
           parsed["data"].is_object()) {
         auto& data = parsed["data"];
-        if (data.contains("started"))
-          state->gameStarted = data.value("started", false);
-        if (!state->gameStarted)
-          state->sim_entities.clear();
-        if (data.contains("time"))
-          state->gameTime = data.value("time", 0);
-        if (data.contains("isPlayerOne")) {
-          state->has_player_slot = true;
-          state->is_player_one = data.value("isPlayerOne", false);
+        bool apply_state = true;
+        if (data.contains("lobbyId") && data["lobbyId"].is_string()) {
+          const std::string wire_lid = data["lobbyId"].get<std::string>();
+          if (!state->lobbyId.empty() && wire_lid != state->lobbyId)
+            apply_state = false;
         }
-        if (state->gameStarted && data.contains("simEntities") &&
-            data["simEntities"].is_array()) {
-          state->sim_entities.clear();
-          for (const auto& item : data["simEntities"]) {
-            SimEntityRow row;
-            row.id = item.value("entityId", 0);
-            row.name = item.value("name", std::string());
-            row.room_alias = item.value("roomAlias", std::string());
-            state->sim_entities.push_back(std::move(row));
+        if (apply_state) {
+          if (data.contains("started"))
+            state->gameStarted = data.value("started", false);
+          if (!state->gameStarted)
+            state->sim_entities.clear();
+          if (data.contains("time"))
+            state->gameTime = data.value("time", 0);
+          if (data.contains("isPlayerOne")) {
+            state->has_player_slot = true;
+            state->is_player_one = data.value("isPlayerOne", false);
           }
+          if (state->gameStarted && data.contains("simEntities") &&
+              data["simEntities"].is_array()) {
+            state->sim_entities.clear();
+            for (const auto& item : data["simEntities"]) {
+              SimEntityRow row;
+              row.id = item.value("entityId", 0);
+              row.name = item.value("name", std::string());
+              row.room_alias = item.value("roomAlias", std::string());
+              state->sim_entities.push_back(std::move(row));
+            }
+          }
+          state->printState();
         }
       }
-
-      state->printState();
     }
   }
   return EM_TRUE;

@@ -4,8 +4,10 @@
 #include "../../GameState.hpp"
 #include "../../camera_nav.hpp"
 #include "../../ws_init.hpp"
+#include "rooms/create_tronic_positions.hpp"
 #include "raylib.h"
 #include <emscripten/websocket.h>
+#include <map>
 #include <string>
 
 namespace mainscene {
@@ -119,15 +121,88 @@ inline void apply_security_feed_or_office_view(
   }
 }
 
-inline void draw_main_scene_3d(Camera& camera, const Model& freddy,
-                              const Vector3& freddyInitialPos, const Model& map,
-                              const Model& p_map) {
-  Vector3 rotationAxis = {0.0f, 1.0f, 0.0f};
-  float rotationAngle = 0.0f;
-  DrawModelEx(freddy, freddyInitialPos, rotationAxis, rotationAngle,
-              (Vector3){50.0f, 50.0f, 50.0f}, WHITE);
+inline const TronicPosition* tronic_pos_for_room(const TronicPositionMap* tpm,
+                                                 const std::string& room_key) {
+  if (!tpm || room_key.empty())
+    return nullptr;
+  auto it = tpm->pos_map.find(room_key);
+  if (it == tpm->pos_map.end())
+    return nullptr;
+  return &it->second;
+}
+
+inline void draw_main_scene_3d(CameraNavState& camera_nav, bool is_player_one,
+                              const GameState& state, const Model& freddy,
+                              const Vector3& freddy_backup_pos,
+                              const std::map<std::string, TronicPositionMap>&
+                                  tronic_by_entity,
+                              const Model& map, const Model& p_map) {
+  const Vector3 rotationAxis = {0.0f, 1.0f, 0.0f};
+  const Vector3 anim_scale = {50.0f, 50.0f, 50.0f};
+
   DrawModel(map, (Vector3){0.0f, 2.5f, -2.5f}, 1.0f, WHITE);
   DrawModel(p_map, (Vector3){1.0f, 50.0f, -13.0f}, 1.0f, WHITE);
+
+  const bool on_feed = camera_nav.active_feed >= 0;
+  if (!on_feed || !state.gameStarted) {
+    DrawModelEx(freddy, freddy_backup_pos, rotationAxis, 0.0f, anim_scale,
+                WHITE);
+    return;
+  }
+
+  int n_cams = 0;
+  const SecurityCamera* cams =
+      CameraMaps::MapForPlayer(is_player_one, &n_cams);
+  if (camera_nav.active_feed >= n_cams || n_cams == 0) {
+    DrawModelEx(freddy, freddy_backup_pos, rotationAxis, 0.0f, anim_scale,
+                WHITE);
+    return;
+  }
+
+  const SecurityCamera& sc = cams[camera_nav.active_feed];
+  const char* sim_alias = sc.sim_room_alias;
+  if (!sim_alias || sim_alias[0] == '\0') {
+    DrawModelEx(freddy, freddy_backup_pos, rotationAxis, 0.0f, anim_scale,
+                WHITE);
+    return;
+  }
+
+  const std::string room_key = tronic_room_key(is_player_one, sim_alias);
+
+  bool any_in_room = false;
+  for (const auto& ent : state.sim_entities) {
+    if (ent.room_alias == sim_alias) {
+      any_in_room = true;
+      break;
+    }
+  }
+  if (!any_in_room) {
+    return;
+  }
+
+  for (const auto& ent : state.sim_entities) {
+    if (ent.room_alias != sim_alias)
+      continue;
+    const TronicPosition* tp = nullptr;
+    auto named = tronic_by_entity.find(ent.name);
+    if (named != tronic_by_entity.end())
+      tp = tronic_pos_for_room(&named->second, room_key);
+    if (!tp) {
+      auto fb = tronic_by_entity.find("freddy");
+      if (fb != tronic_by_entity.end())
+        tp = tronic_pos_for_room(&fb->second, room_key);
+    }
+    Vector3 pos = freddy_backup_pos;
+    Vector3 ax = rotationAxis;
+    float ang = 0.0f;
+    if (tp) {
+      pos = tp->position;
+      ax = tp->rotationAxis;
+      ang = tp->rotationAngle;
+    }
+    pos.x += static_cast<float>((ent.id % 5) * 2 - 4) * 0.35f;
+    DrawModelEx(freddy, pos, ax, ang, anim_scale, WHITE);
+  }
 }
 
 inline void draw_main_scene_2d(Camera& camera, CameraNavState& camera_nav,

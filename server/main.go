@@ -41,10 +41,18 @@ type GameRoomState struct {
 	Sim             *GameState `json:"-"`
 }
 
+// SimEntityWire is a single animatronic position in the live sim (for clients).
+type SimEntityWire struct {
+	EntityID  int16  `json:"entityId"`
+	Name      string `json:"name"`
+	RoomAlias string `json:"roomAlias"`
+}
+
 // gameStateWire is the JSON sent to a single client (includes per-client isPlayerOne).
 type gameStateWire struct {
 	GameRoomState
-	IsPlayerOne bool `json:"isPlayerOne"`
+	IsPlayerOne bool            `json:"isPlayerOne"`
+	SimEntities []SimEntityWire `json:"simEntities,omitempty"`
 }
 
 func stateForClient(room *GameRoomState, remoteAddr string) gameStateWire {
@@ -57,6 +65,9 @@ func stateForClient(room *GameRoomState, remoteAddr string) gameStateWire {
 	default:
 		w.IsPlayerOne = false
 	}
+	if room.Sim != nil {
+		w.SimEntities = room.Sim.SnapshotSimEntities()
+	}
 	return w
 }
 
@@ -65,7 +76,7 @@ type Message struct {
 	Data interface{} `json:"data"`
 }
 
-const NIGHT_IN_MINUTES = 1
+const NIGHT_IN_MINUTES = 99
 
 var connectedUsersSet = make(map[string]*UserWsConnection)
 var lobbySet = make(map[string]*GameRoomState)
@@ -80,7 +91,7 @@ func writeJSON(conn *websocket.Conn, t string, data interface{}) {
 // runSimStepTicker advances night time and the entity sim once per second for
 // every started lobby (not tied to which client owns the WebSocket).
 func runSimStepTicker() {
-	ticker := time.NewTicker(time.Second)
+	ticker := time.NewTicker(time.Second * 10)
 	defer ticker.Stop()
 	var inter = 0
 	for range ticker.C {
@@ -90,7 +101,7 @@ func runSimStepTicker() {
 			}
 			room.Time++
 			fmt.Printf(lobbyID)
-			if inter < 1 {
+			if true {
 				// room.Sim.Step(lobbyID)
 				inter++
 			}

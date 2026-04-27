@@ -1,0 +1,25 @@
+{
+  "name": "2026-spring-project",
+  "version": "1.0.0",
+  "description": "[https://github.com/jrny6996/2026-spring-project/tree/master](https://github.com/jrny6996/2026-spring-project/tree/master)",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev" :"concurrently 'cd client_wasm && ./run.sh' 'cd server && go run .'"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jrny6996/2026-spring-project.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/jrny6996/2026-spring-project/issues"
+  },
+  "homepage": "https://github.com/jrny6996/2026-spring-project#readme",
+  "dependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

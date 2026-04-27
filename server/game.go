@@ -266,7 +266,33 @@ func (gs *GameState) Step(lobbyID string) {
 	for id, node := range gs.Tracker.EntityPositions {
 		log.Printf("[lobby %s]   entity %d at %s", lobbyID, id, node.AliasName)
 	}
+	for id := range gs.Tracker.EntityPositions {
+		gs.CheckEntityInPlayerRoom(id, lobbyID)
+	}
 }
+// SnapshotSimEntities builds the list of animatronics and their room aliases for clients.
+func (gs *GameState) SnapshotSimEntities() []SimEntityWire {
+	if gs == nil || gs.Tracker == nil {
+		return nil
+	}
+	out := make([]SimEntityWire, 0, len(gs.Tracker.EntityPositions))
+	for id, node := range gs.Tracker.EntityPositions {
+		name := ""
+		for _, e := range node.Entities {
+			if e.Id == id {
+				name = e.Name
+				break
+			}
+		}
+		out = append(out, SimEntityWire{
+			EntityID:  id,
+			Name:      name,
+			RoomAlias: node.AliasName,
+		})
+	}
+	return out
+}
+
 func (gs *GameState) FindNodeByAlias(alias string) *GameGraphNode {
 	// Search P1 graph first
 	if node := FindNodeByAlias(gs.P1Graph, alias); node != nil {
@@ -278,7 +304,9 @@ func (gs *GameState) FindNodeByAlias(alias string) *GameGraphNode {
 
 // CheckEntityInPlayerRoom reports whether the entity is in a camera-visible room
 // (not either player office). found is false if the id is not in the tracker.
-func (gs *GameState) CheckEntityInPlayerRoom(entityID int16) (inPlayerRoom bool, roomAlias string, found bool) {
+// When lobbyID is non-empty and the entity is in an office, logs that the sim has
+// the entity in-room but security feeds cannot render them there.
+func (gs *GameState) CheckEntityInPlayerRoom(entityID int16, lobbyID string) (inPlayerRoom bool, roomAlias string, found bool) {
 	if gs == nil || gs.Tracker == nil {
 		return false, "", false
 	}
@@ -289,6 +317,20 @@ func (gs *GameState) CheckEntityInPlayerRoom(entityID int16) (inPlayerRoom bool,
 	roomAlias = node.AliasName
 	switch node.AliasName {
 	case "player_one_office", "player_two_office":
+		if lobbyID != "" {
+			var name string
+			for _, e := range node.Entities {
+				if e.Id == entityID {
+					name = e.Name
+					break
+				}
+			}
+			if name != "" {
+				log.Printf("[lobby %s] entity %d (%s) in %s — in sim room but not on security cameras", lobbyID, entityID, name, roomAlias)
+			} else {
+				log.Printf("[lobby %s] entity %d in %s — in sim room but not on security cameras", lobbyID, entityID, roomAlias)
+			}
+		}
 		return false, roomAlias, true
 	default:
 		return true, roomAlias, true

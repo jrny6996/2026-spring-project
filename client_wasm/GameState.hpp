@@ -7,6 +7,13 @@ struct CheckCameraEntityRow {
   std::string name;
 };
 
+/// One animatronic from server `state.simEntities` (live sim positions).
+struct SimEntityRow {
+  int id = 0;
+  std::string name;
+  std::string room_alias;
+};
+
 class GameState {
  public:
   std::string lobbyId;
@@ -14,6 +21,8 @@ class GameState {
   std::string check_camera_status;
   /// Entities reported for the last camera-room check (server sim).
   std::vector<CheckCameraEntityRow> check_camera_entities;
+  /// Live sim positions (from periodic `state` messages while the game runs).
+  std::vector<SimEntityRow> sim_entities;
   bool lobby_created = false;
   /// True if this client created the lobby (invite); false if they joined with an id.
   bool is_lobby_host = false;

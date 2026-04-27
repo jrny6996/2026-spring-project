@@ -140,11 +140,24 @@ inline EM_BOOL on_message(int, const EmscriptenWebSocketMessageEvent* e,
         auto& data = parsed["data"];
         if (data.contains("started"))
           state->gameStarted = data.value("started", false);
+        if (!state->gameStarted)
+          state->sim_entities.clear();
         if (data.contains("time"))
           state->gameTime = data.value("time", 0);
         if (data.contains("isPlayerOne")) {
           state->has_player_slot = true;
           state->is_player_one = data.value("isPlayerOne", false);
+        }
+        if (state->gameStarted && data.contains("simEntities") &&
+            data["simEntities"].is_array()) {
+          state->sim_entities.clear();
+          for (const auto& item : data["simEntities"]) {
+            SimEntityRow row;
+            row.id = item.value("entityId", 0);
+            row.name = item.value("name", std::string());
+            row.room_alias = item.value("roomAlias", std::string());
+            state->sim_entities.push_back(std::move(row));
+          }
         }
       }
 

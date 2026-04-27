@@ -8,9 +8,12 @@
 #include "camera_nav.hpp"
 #include "pbr_light_ids.hpp"
 #include "raylib.h"
+#include <map>
+#include <string>
 #include "mainscene/helpers/camera_control.hpp"
 #include "mainscene/helpers/frame.hpp"
 #include "mainscene/helpers/pbr_lights.hpp"
+#include "mainscene/helpers/rooms/create_tronic_positions.hpp"
 #include "ws_init.hpp"
 Vector3 camPos = {0.0f, 5.0f, 0.0f};
 float yaw = PI;
@@ -30,6 +33,7 @@ class MainScene : public Scene {
   mainscene::PbrLightGPU
       pbr_lights_[mainscene::kMaxPbrLights];
   int pbr_light_count_ = 0;
+  std::map<std::string, TronicPositionMap> tronic_maps_;
 
   void enable_pbr() {
     mainscene::setup_pbr_shader_locs(map_shader);
@@ -80,6 +84,7 @@ class MainScene : public Scene {
     preloader.EndServe();
 
     enable_pbr();
+    this->tronic_maps_ = create_tronic_positions(this->freddy);
     this->camera.fovy = 50.0f;
     this->camera.target.x = -1.0f;
     this->camera.target.z = 10.0f;
@@ -131,8 +136,9 @@ class MainScene : public Scene {
                                      pbr_light_count_, camPos);
     BeginDrawing();
     BeginMode3D(this->camera);
-    mainscene::draw_main_scene_3d(this->camera, this->freddy,
-                                 this->freddyInitialPos, this->map, this->p_map);
+    mainscene::draw_main_scene_3d(this->camera_nav_, state.is_player_one, state,
+                                  this->freddy, this->freddyInitialPos,
+                                  this->tronic_maps_, this->map, this->p_map);
     EndMode3D();
     mainscene::draw_main_scene_2d(this->camera, camera_nav_, state);
     EndDrawing();

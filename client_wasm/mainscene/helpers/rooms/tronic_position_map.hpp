@@ -1,6 +1,5 @@
 #pragma once
 #include <initializer_list>
-#include <iostream>
 #include <map>
 #include <string>
 #include "raylib.h"
@@ -40,8 +39,6 @@ class TronicPositionMap {
       const auto pos = pos_map[room_key];
       DrawModelEx(this->model, pos.position, pos.rotationAxis,
                   pos.rotationAngle, this->scale, this->tint);
-    } else {
-      std::cout << "not found\n";
     }
   }
 };

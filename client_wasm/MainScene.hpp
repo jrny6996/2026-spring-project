@@ -102,8 +102,8 @@ class MainScene : public Scene {
 
     enable_pbr();
     const TronicRosterSpec tronic_roster{
-        {this->freddy, {50.0f, 50.0f, 50.0f}, {1.0f, 0.0f, -4.0f}},
-        {this->bonnie, {0.045f, 0.045f, 0.045f}, {-4.15f, 0.0f, 0.35f}},
+        {this->freddy, {50.0f, 50.0f, 50.0f}, {1.0f, 0.0f, 1.0f}},
+        {this->bonnie, {0.045f, 0.045f, 0.045f}, {-2.15f, 0.0f, 0.35f}},
         {this->chica, {0.068f, 0.068f, 0.068f}, {2.15f, 0.0f, 0.35f}},
         {this->foxy, {0.048f, 0.048f, 0.048f}, {0.0f, 0.0f, -0.95f}},
     };

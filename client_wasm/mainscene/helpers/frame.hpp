@@ -338,9 +338,8 @@ inline void draw_main_scene_3d(
   if (animatronic_model_count < 2)
     return;
   const Model& default_mesh = *animatronic_models[1];
-
-  DrawModel(map, (Vector3){0.0f, 2.5f, -2.5f}, 1.0f, WHITE);
-  DrawModel(p_map, (Vector3){1.0f, 50.0f, -13.0f}, 1.0f, WHITE);
+  if(state.is_player_one) DrawModel(map, (Vector3){0.0f, 2.5f, -2.5f}, 1.0f, WHITE);
+  else DrawModel(p_map, (Vector3){1.0f, 50.0f, -13.0f}, 1.0f, WHITE);
 
   const bool on_feed = camera_nav.active_feed >= 0;
   if (!on_feed || !state.gameStarted) {

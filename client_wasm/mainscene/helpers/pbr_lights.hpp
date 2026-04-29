@@ -177,7 +177,7 @@ inline void setup_pbr_shader_locs(Shader& map_shader) {
 inline void setup_pbr_shader_uniform_defaults(Shader& map_shader) {
   // numOfLights is set in sync_pbr_shader_frame() to match pbr light count.
   Vector3 ambient_rgb = {0.0f, 0.0f, 0.0f};
-  float ambient_strength = -0.5f;
+  float ambient_strength = -1.0f;
   SetShaderValue(map_shader, GetShaderLocation(map_shader, "ambientColor"),
                  &ambient_rgb, SHADER_UNIFORM_VEC3);
   SetShaderValue(map_shader, GetShaderLocation(map_shader, "ambient"),

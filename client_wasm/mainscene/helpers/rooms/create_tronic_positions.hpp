@@ -105,8 +105,8 @@ inline TronicPositionMap make_tronic_layout(const Model& model) {
        {"bathrooms", {{16.5f, 3.0f, -30.0f}, {0, 1, 0}, 0.0f}},
        {"lhs_hall", {{-4.5f, 2.5f, -13.0f}, {0, 1, 0}, 0.0f}},
        {"rhs_hall", {{4.0f, 2.5f, -13.0f}, {0, 1, 0}, 0.0f}},
-       {"lhs_door", {{-4.0f, 2.5f, -2.5f}, {0, 1, 0}, 180.0f}},
-       {"rhs_door", {{4.5f, 2.5f, -2.0f}, {0, 1, 0}, 180.0f}},
+       {"lhs_door", {{-4.0f, 2.5f, -2.5f}, {0, 1, 0}, 90.0f}},
+       {"rhs_door", {{4.5f, 2.5f, -2.0f}, {0, 1, 0}, -90.0f}},
 
        {"lhs_closet", {{-3.35f, 2.5f, 3.5f}, {0, 1, 0}, 180.0f}},
        {"rhs_closet", {{3.35f, 2.5f, 3.5f}, {0, 1, 0}, 180.0f}},

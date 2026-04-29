@@ -200,6 +200,14 @@ inline bool resolve_tronic_draw_transform(
   return true;
 }
 
+inline bool should_apply_character_offset(const SimEntityRow& ent) {
+  if (ent.id >= 1 && ent.id <= 4)
+    return ent.room_alias == "stage";
+  if (ent.id >= 11 && ent.id <= 14)
+    return ent.room_alias == "toy_stage";
+  return false;
+}
+
 /// `only_room_alias`: if non-null, only draw entities in that sim room (security
 /// feed). If null, draw every entity that has a mapped 3D position (world / office
 /// view). `use_backup_when_pos_missing` matches the feed: still draw at backup pos
@@ -252,9 +260,11 @@ inline std::size_t draw_tronic_sim_entities(
         off = fb->second.character_offset;
       }
     }
-    pos.x += off.x;
-    pos.y += off.y;
-    pos.z += off.z;
+    if (should_apply_character_offset(ent)) {
+      pos.x += off.x;
+      pos.y += off.y;
+      pos.z += off.z;
+    }
     auto occ_it = occupancy.find(ent.room_alias);
     if (occ_it != occupancy.end() && occ_it->second > 1) {
       const float spread = 0.42f;
@@ -311,9 +321,11 @@ inline std::size_t draw_tronic_sim_entities_matching_debug_hud(
         off = fb->second.character_offset;
       }
     }
-    pos.x += off.x;
-    pos.y += off.y;
-    pos.z += off.z;
+    if (should_apply_character_offset(ent)) {
+      pos.x += off.x;
+      pos.y += off.y;
+      pos.z += off.z;
+    }
     auto occ_it = occupancy.find(ent.room_alias);
     if (occ_it != occupancy.end() && occ_it->second > 1) {
       const float spread = 0.42f;
@@ -449,9 +461,11 @@ inline void draw_tronic_coords_debug_hud(
       if (fb != tronic_by_entity.end())
         off = fb->second.character_offset;
     }
-    pos.x += off.x;
-    pos.y += off.y;
-    pos.z += off.z;
+    if (should_apply_character_offset(ent)) {
+      pos.x += off.x;
+      pos.y += off.y;
+      pos.z += off.z;
+    }
     auto occ_it = occupancy.find(ent.room_alias);
     if (occ_it != occupancy.end() && occ_it->second > 1) {
       const float spread = 0.42f;

@@ -112,8 +112,16 @@ inline EM_BOOL on_message(int, const EmscriptenWebSocketMessageEvent* e,
       }
       if (parsed.contains("type") && parsed["type"] == "status") {
         const std::string status = parsed.value("data", std::string());
-        if (status == "lose") {
-          state->check_camera_status = "You lose";
+        if (status.rfind("lose", 0) == 0) {
+          std::string killer;
+          if (status.size() > 5)
+            killer = status.substr(5);
+          if (!killer.empty()) {
+            printf("You lost to: %s\n", killer.c_str());
+            state->check_camera_status = "You lose - killed by " + killer;
+          } else {
+            state->check_camera_status = "You lose";
+          }
           state->gameStarted = false;
         } else if (status == "win") {
           state->check_camera_status = "You win";

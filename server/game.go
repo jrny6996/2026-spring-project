@@ -38,12 +38,24 @@ func (g *GameGraphNode) AddNext(nodes ...*GameGraphNode) {
 type EntityTracker struct {
 	EntityPositions map[int16]*GameGraphNode
 	EntityPaths     map[int16][]*GameGraphNode
+	ChokeCooldowns  map[string]int
 }
 
 func NewEntityTracker() *EntityTracker {
 	return &EntityTracker{
 		EntityPositions: make(map[int16]*GameGraphNode),
 		EntityPaths:     make(map[int16][]*GameGraphNode),
+		ChokeCooldowns:  make(map[string]int),
+	}
+}
+
+func (et *EntityTracker) AdvanceTickCooldowns() {
+	for alias, ticks := range et.ChokeCooldowns {
+		if ticks <= 1 {
+			delete(et.ChokeCooldowns, alias)
+			continue
+		}
+		et.ChokeCooldowns[alias] = ticks - 1
 	}
 }
 
@@ -58,6 +70,17 @@ func (et *EntityTracker) MoveEntity(e Entity) {
 	if curr == nil || len(curr.NextNodes) == 0 {
 		return
 	}
+	// Door nodes are the pre-office choke points; when blocked, do not allow
+	// passing through to office even if the next node itself is unblocked.
+	if curr.IsBlocked &&
+		(curr.AliasName == "lhs_door" || curr.AliasName == "rhs_door") {
+		if isSingleOccupancyChoke(curr.AliasName) {
+			et.ChokeCooldowns[curr.AliasName] = 1
+		}
+		// Closed office door means a full retreat, not a one-node shuffle.
+		et.ResetToStart(e)
+		return
+	}
 
 	var next *GameGraphNode
 	if int(e.PreferredNextIndex) < len(curr.NextNodes) {
@@ -70,7 +93,18 @@ func (et *EntityTracker) MoveEntity(e Entity) {
 		et.ResetToStart(e)
 		return
 	}
+	if isSingleOccupancyChoke(next.AliasName) {
+		if len(next.Entities) > 0 {
+			return
+		}
+		if et.ChokeCooldowns[next.AliasName] > 0 {
+			return
+		}
+	}
 
+	if isSingleOccupancyChoke(curr.AliasName) && curr != next {
+		et.ChokeCooldowns[curr.AliasName] = 1
+	}
 	curr.Entities = removeEntity(curr.Entities, e.Id)
 	next.Entities = append(next.Entities, e)
 	et.EntityPositions[e.Id] = next
@@ -105,6 +139,15 @@ func removeEntity(entities []Entity, id int16) []Entity {
 		}
 	}
 	return entities
+}
+
+func isSingleOccupancyChoke(alias string) bool {
+	switch alias {
+	case "lhs_door", "rhs_door", "hallway_close_before_office":
+		return true
+	default:
+		return false
+	}
 }
 
 // --- Game Graph Creation ---
@@ -294,6 +337,7 @@ func (gs *GameState) Step(lobbyID string) {
 		log.Printf("[lobby %s]   entity %d at %s", lobbyID, id, node.AliasName)
 	}
 	gs.Time++
+	gs.Tracker.AdvanceTickCooldowns()
 	entityIDs := make([]int16, 0, len(gs.Tracker.EntityPositions))
 	for id := range gs.Tracker.EntityPositions {
 		entityIDs = append(entityIDs, id)
@@ -430,6 +474,27 @@ func (gs *GameState) AnyEntityInRoom(alias string) bool {
 		}
 	}
 	return false
+}
+
+func (gs *GameState) FirstEntityNameInRoom(alias string) (string, bool) {
+	if gs == nil || gs.Tracker == nil {
+		return "", false
+	}
+	for id, node := range gs.Tracker.EntityPositions {
+		if node == nil || node.AliasName != alias {
+			continue
+		}
+		for _, e := range node.Entities {
+			if e.Id == id && e.Name != "" {
+				return e.Name, true
+			}
+		}
+		fallback := nameForEntityID(id)
+		if fallback != "" {
+			return fallback, true
+		}
+	}
+	return "", false
 }
 
 func main1() {

@@ -41,6 +41,9 @@ type GameRoomState struct {
 	Host            string     `json:"host"`
 	Accepted        bool       `json:"accepted"`
 	Acceptor        string     `json:"acceptor"`
+	Power           int        `json:"power"`
+	LHSDoorDown     bool       `json:"lhsDoorDown"`
+	RHSDoorDown     bool       `json:"rhsDoorDown"`
 	Rooms           []Room     `json:"rooms"`
 	HostIsPlayerOne bool       `json:"-"`
 	Sim             *GameState `json:"-"`
@@ -129,7 +132,7 @@ func handleNightEnd(lobbyID string) {
 	cleanupLobby(lobbyID)
 }
 
-func handleLobbyLose(lobbyID string) {
+func handleLobbyLose(lobbyID string, killer string) {
 	var batch []*UserWsConnection
 	for _, u := range connectedUsersSet {
 		if u == nil || u.LobbyID != lobbyID || u.Conn == nil {
@@ -139,7 +142,11 @@ func handleLobbyLose(lobbyID string) {
 	}
 	for _, u := range batch {
 		u.WriteMu.Lock()
-		_ = u.Conn.WriteJSON(Message{Type: "status", Data: "lose"})
+		status := "lose"
+		if killer != "" {
+			status = "lose:" + killer
+		}
+		_ = u.Conn.WriteJSON(Message{Type: "status", Data: status})
 		_ = u.Conn.Close()
 		u.Conn = nil
 		u.WriteMu.Unlock()
@@ -300,11 +307,14 @@ func main() {
 
 func newGameRoomState(host string) GameRoomState {
 	return GameRoomState{
-		Time:     0,
-		Started:  false,
-		Host:     host,
-		Accepted: false,
-		Acceptor: "",
+		Time:        0,
+		Started:     false,
+		Host:        host,
+		Accepted:    false,
+		Acceptor:    "",
+		Power:       30,
+		LHSDoorDown: false,
+		RHSDoorDown: false,
 		Rooms: []Room{
 			{
 				EntityID:   0,
@@ -405,6 +415,9 @@ func handleStartGame(conn *websocket.Conn, r *http.Request) {
 
 	room.HostIsPlayerOne = rand.Intn(2) == 1
 	room.Started = true
+	room.Power = 30
+	room.LHSDoorDown = false
+	room.RHSDoorDown = false
 	room.Sim = NewGameState()
 	room.Sim.SpawnEntities()
 	log.Printf("lobby %s: SpawnEntities done, sim ready", user.LobbyID)
@@ -427,9 +440,20 @@ func handleStepGame(conn *websocket.Conn, r *http.Request) {
 	}
 
 	room.Time++
+	if room.LHSDoorDown {
+		room.Power--
+	}
+	if room.RHSDoorDown {
+		room.Power--
+	}
+	if room.Power <= 0 {
+		handleLobbyLose(user.LobbyID, "power_out")
+		return
+	}
 	room.Sim.Step(user.LobbyID)
 	if room.Sim.AnyEntityInRoom("player_one_office") {
-		handleLobbyLose(user.LobbyID)
+		killer, _ := room.Sim.FirstEntityNameInRoom("player_one_office")
+		handleLobbyLose(user.LobbyID, killer)
 		return
 	}
 	broadcastStateToLobby(user.LobbyID)
@@ -461,10 +485,12 @@ func handleActionGame(conn *websocket.Conn, r *http.Request, content string) {
 
 	switch side {
 	case "lhs":
+		room.LHSDoorDown = closed
 		if room.Sim.LHSDoor != nil {
 			room.Sim.LHSDoor.IsBlocked = closed
 		}
 	case "rhs":
+		room.RHSDoorDown = closed
 		if room.Sim.RHSDoor != nil {
 			room.Sim.RHSDoor.IsBlocked = closed
 		}

@@ -183,6 +183,8 @@ class MainScene : public Scene {
     mainscene::try_send_check_camera_room(state, camera_nav_, socket);
     if (IsKeyPressed(KEY_L))
       debug_tronic_coords_ = !debug_tronic_coords_;
+    if (state.gameStarted && IsKeyPressed(KEY_T))
+      ws::send_step(socket);
     update_doors();
 
     mainscene::clamp_and_apply_pbr_for_security_feed(

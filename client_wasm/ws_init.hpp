@@ -50,6 +50,11 @@ inline void send_check_camera(EMSCRIPTEN_WEBSOCKET_T socket,
   send_json_message(socket, "check", sim_room_alias);
 }
 
+/// Ask server to advance one manual simulation step (for paused sim loop).
+inline void send_step(EMSCRIPTEN_WEBSOCKET_T socket) {
+  send_json_message(socket, "step", "tick");
+}
+
 inline bool try_parse_json(const char* data, size_t len, json& out) {
   try {
     out = json::parse(std::string(data, len));

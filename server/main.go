@@ -252,6 +252,8 @@ func main() {
 					fmt.Println("Starting game")
 					handleStartGame(conn, r)
 				}
+			case "step":
+				handleStepGame(conn, r)
 
 			default:
 				writeJSONToUser(connectedUsersSet[addr], "error", "unknown-type")
@@ -374,6 +376,30 @@ func handleStartGame(conn *websocket.Conn, r *http.Request) {
 	room.Sim.SpawnEntities()
 	log.Printf("lobby %s: SpawnEntities done, sim ready", user.LobbyID)
 	writeJSONToUser(user, "state", stateForClient(room, r.RemoteAddr, user.LobbyID))
+}
+
+func handleStepGame(conn *websocket.Conn, r *http.Request) {
+	user := connectedUsersSet[r.RemoteAddr]
+	if user == nil {
+		return
+	}
+	room, exists := lobbySet[user.LobbyID]
+	if !exists {
+		writeJSONToUser(user, "error", "no-lobby")
+		return
+	}
+	if !room.Started || room.Sim == nil {
+		writeJSONToUser(user, "error", "game-not-started")
+		return
+	}
+
+	room.Time++
+	room.Sim.Step(user.LobbyID)
+	broadcastStateToLobby(user.LobbyID)
+
+	if int(room.Time) > NIGHT_IN_MINUTES*60 {
+		handleNightEnd(user.LobbyID)
+	}
 }
 
 func cleanupLobby(lobbyID string) {

@@ -54,19 +54,19 @@ inline void apply_free_cam_move(Vector3& camPos, float yaw, bool is_freeroam) {
   float rx = -cosf(yaw);
   float rz = sinf(yaw);
   float s = kFreeCamMoveSpeed * dt;
-  if (IsKeyDown(KEY_W)) {
+  if (IsKeyDown(KEY_UP)) {
     camPos.x += fx * s;
     camPos.z += fz * s;
   }
-  if (IsKeyDown(KEY_S)) {
+  if (IsKeyDown(KEY_DOWN)) {
     camPos.x -= fx * s;
     camPos.z -= fz * s;
   }
-  if (IsKeyDown(KEY_D)) {
+  if (IsKeyDown(KEY_RIGHT)) {
     camPos.x -= rx * s;
     camPos.z -= rz * s;
   }
-  if (IsKeyDown(KEY_A)) {
+  if (IsKeyDown(KEY_LEFT)) {
     camPos.x += rx * s;
     camPos.z += rz * s;
   }

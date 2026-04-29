@@ -516,7 +516,9 @@ inline void draw_main_scene_2d(Camera& camera, CameraNavState& camera_nav,
   }
   DrawText("Cam feed: C = entities in this cam room (after start)", 10, 100,
            16, Fade(LIGHTGRAY, 0.85f));
-  DrawText("F3 = toggle tronic x,y,z (after start)", 10, 118, 14,
+  DrawText("T = manual server sim step (after start)", 10, 118, 14,
+           Fade(LIGHTGRAY, 0.75f));
+  DrawText("F3 = toggle tronic x,y,z (after start)", 10, 134, 14,
            Fade(LIGHTGRAY, 0.75f));
 }
 

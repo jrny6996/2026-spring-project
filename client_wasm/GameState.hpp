@@ -35,6 +35,7 @@ class GameState {
 
   bool has_player_slot = false;
   bool is_player_one = false;
+  bool p2_mask_down = false;
 
   /// Security-camera check: server round-trip in progress; feed is suspended.
   bool check_camera_in_flight = false;

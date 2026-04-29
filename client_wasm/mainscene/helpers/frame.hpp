@@ -503,6 +503,11 @@ inline void draw_main_scene_2d(Camera& camera, CameraNavState& camera_nav,
     const char* label = state.is_player_one ? "Player 1" : "Player 2";
     DrawText(label, 10, 64, 16, WHITE);
   }
+  if (!state.is_player_one) {
+    const char* mask_label = state.p2_mask_down ? "Mask: DOWN" : "Mask: UP";
+    Color mask_color = state.p2_mask_down ? GREEN : ORANGE;
+    DrawText(mask_label, 10, 82, 16, mask_color);
+  }
   if (show_tronic_coords_debug) {
     draw_tronic_coords_debug_hud(state, tronic_by_entity, tronic_default_pos);
   }

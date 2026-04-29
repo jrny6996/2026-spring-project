@@ -204,6 +204,9 @@ inline EM_BOOL on_message(int, const EmscriptenWebSocketMessageEvent* e,
             state->has_player_slot = true;
             state->is_player_one = data.value("isPlayerOne", false);
           }
+          if (data.contains("p2MaskDown")) {
+            state->p2_mask_down = data.value("p2MaskDown", false);
+          }
           if (state->gameStarted && data.contains("simEntities") &&
               data["simEntities"].is_array()) {
             state->sim_entities.clear();

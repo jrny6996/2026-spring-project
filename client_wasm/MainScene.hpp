@@ -63,10 +63,10 @@ class MainScene : public Scene {
     mainscene::assign_pbr_to_model(map_shader, foxy);
     mainscene::assign_pbr_to_model(map_shader, door);
   }
-  void update_doors() {
-    if (IsKeyPressed(KEY_Q))
+  void update_doors(bool allow_input) {
+    if (allow_input && IsKeyPressed(KEY_Q))
       left_door_closed_ = !left_door_closed_;
-    if (IsKeyPressed(KEY_E))
+    if (allow_input && IsKeyPressed(KEY_E))
       right_door_closed_ = !right_door_closed_;
 
     const float dt = GetFrameTime();
@@ -185,7 +185,19 @@ class MainScene : public Scene {
       debug_tronic_coords_ = !debug_tronic_coords_;
     if (state.gameStarted && IsKeyPressed(KEY_T))
       ws::send_step(socket);
-    update_doors();
+    if (state.gameStarted && state.is_player_one) {
+      const bool prev_left = left_door_closed_;
+      const bool prev_right = right_door_closed_;
+      update_doors(true);
+      if (prev_left != left_door_closed_) {
+        ws::send_door_state(socket, "lhs", left_door_closed_);
+      }
+      if (prev_right != right_door_closed_) {
+        ws::send_door_state(socket, "rhs", right_door_closed_);
+      }
+    } else {
+      update_doors(false);
+    }
 
     mainscene::clamp_and_apply_pbr_for_security_feed(
         state, camera_nav_, pbr_lights_, pbr_light_count_);

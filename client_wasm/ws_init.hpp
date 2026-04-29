@@ -55,6 +55,15 @@ inline void send_step(EMSCRIPTEN_WEBSOCKET_T socket) {
   send_json_message(socket, "step", "tick");
 }
 
+/// Update first-floor office door state on the server.
+/// side: "lhs" | "rhs", state: "open" | "closed"
+inline void send_door_state(EMSCRIPTEN_WEBSOCKET_T socket, const char* side,
+                            bool closed) {
+  const std::string content =
+      std::string("door:") + side + ":" + (closed ? "closed" : "open");
+  send_json_message(socket, "action", content);
+}
+
 inline bool try_parse_json(const char* data, size_t len, json& out) {
   try {
     out = json::parse(std::string(data, len));
@@ -100,6 +109,16 @@ inline EM_BOOL on_message(int, const EmscriptenWebSocketMessageEvent* e,
         state->is_lobby_host = false;
         state->menu_error.clear();
         state->menu_creating_lobby = false;
+      }
+      if (parsed.contains("type") && parsed["type"] == "status") {
+        const std::string status = parsed.value("data", std::string());
+        if (status == "lose") {
+          state->check_camera_status = "You lose";
+          state->gameStarted = false;
+        } else if (status == "win") {
+          state->check_camera_status = "You win";
+          state->gameStarted = false;
+        }
       }
       if (parsed.contains("type") && parsed["type"] == "error") {
         std::string detail;

@@ -129,6 +129,37 @@ func handleNightEnd(lobbyID string) {
 	cleanupLobby(lobbyID)
 }
 
+func handleLobbyLose(lobbyID string) {
+	var batch []*UserWsConnection
+	for _, u := range connectedUsersSet {
+		if u == nil || u.LobbyID != lobbyID || u.Conn == nil {
+			continue
+		}
+		batch = append(batch, u)
+	}
+	for _, u := range batch {
+		u.WriteMu.Lock()
+		_ = u.Conn.WriteJSON(Message{Type: "status", Data: "lose"})
+		_ = u.Conn.Close()
+		u.Conn = nil
+		u.WriteMu.Unlock()
+	}
+	cleanupLobby(lobbyID)
+}
+
+func isPlayerOneUser(room *GameRoomState, remote string) bool {
+	if room == nil {
+		return false
+	}
+	if remote == room.Host {
+		return room.HostIsPlayerOne
+	}
+	if remote == room.Acceptor {
+		return !room.HostIsPlayerOne
+	}
+	return false
+}
+
 // runSimStepTicker advances night time and the sim for each started lobby
 // on a single shared interval (one tick every 10s; each lobby has its own room).
 func runSimStepTicker() {
@@ -254,6 +285,8 @@ func main() {
 				}
 			case "step":
 				handleStepGame(conn, r)
+			case "action":
+				handleActionGame(conn, r, msgJson.Content)
 
 			default:
 				writeJSONToUser(connectedUsersSet[addr], "error", "unknown-type")
@@ -395,10 +428,46 @@ func handleStepGame(conn *websocket.Conn, r *http.Request) {
 
 	room.Time++
 	room.Sim.Step(user.LobbyID)
+	if room.Sim.AnyEntityInRoom("player_one_office") {
+		handleLobbyLose(user.LobbyID)
+		return
+	}
 	broadcastStateToLobby(user.LobbyID)
 
 	if int(room.Time) > NIGHT_IN_MINUTES*60 {
 		handleNightEnd(user.LobbyID)
+	}
+}
+
+func handleActionGame(conn *websocket.Conn, r *http.Request, content string) {
+	user := connectedUsersSet[r.RemoteAddr]
+	if user == nil {
+		return
+	}
+	room, exists := lobbySet[user.LobbyID]
+	if !exists || !room.Started || room.Sim == nil {
+		return
+	}
+	if !isPlayerOneUser(room, r.RemoteAddr) {
+		return
+	}
+
+	parts := strings.Split(content, ":")
+	if len(parts) != 3 || parts[0] != "door" {
+		return
+	}
+	side := parts[1]
+	closed := parts[2] == "closed"
+
+	switch side {
+	case "lhs":
+		if room.Sim.LHSDoor != nil {
+			room.Sim.LHSDoor.IsBlocked = closed
+		}
+	case "rhs":
+		if room.Sim.RHSDoor != nil {
+			room.Sim.RHSDoor.IsBlocked = closed
+		}
 	}
 }
 

@@ -26,6 +26,9 @@ type GameGraphNode struct {
 
 func (g *GameGraphNode) AddNext(nodes ...*GameGraphNode) {
 	for _, n := range nodes {
+		if n == nil {
+			continue
+		}
 		g.NextNodes = append(g.NextNodes, n)
 		n.PrevNode = g
 	}
@@ -108,7 +111,7 @@ func removeEntity(entities []Entity, id int16) []Entity {
 func CreateInitialMap(NightNum int16) *GameGraphNode {
 	p1_office := &GameGraphNode{RoomID: 100, AliasName: "player_one_office"}
 
-	lhs_door := &GameGraphNode{RoomID: 5, AliasName: "lhs_door", IsBlocked: true}
+	lhs_door := &GameGraphNode{RoomID: 5, AliasName: "lhs_door", IsBlocked: false}
 	lhs_closet := &GameGraphNode{RoomID: 4, AliasName: "lhs_closet"}
 	lhs_hall := &GameGraphNode{RoomID: 3, AliasName: "lhs_hall"}
 
@@ -144,6 +147,7 @@ func CreateP2Map(NightNum int16) *GameGraphNode {
 	lhs_party := &GameGraphNode{RoomID: 100, AliasName: "lhs_party"}
 	lhs_party_two := &GameGraphNode{RoomID: 100, AliasName: "lhs_party_two"}
 	lhs_repair := &GameGraphNode{RoomID: 100, AliasName: "lhs_repair"}
+	lhs_hall := &GameGraphNode{RoomID: 100, AliasName: "p2_lhs_hall"}
 
 	rhs_vent := &GameGraphNode{RoomID: 100, AliasName: "rhs_vent"}
 	rhs_party_one := &GameGraphNode{RoomID: 100, AliasName: "rhs_party_one"}
@@ -153,24 +157,34 @@ func CreateP2Map(NightNum int16) *GameGraphNode {
 	middle_door := &GameGraphNode{RoomID: 100, AliasName: "center_door"}
 	middle_hall_two := &GameGraphNode{RoomID: 100, AliasName: "middle_hall_two"}
 	middle_hall_one := &GameGraphNode{RoomID: 100, AliasName: "middle_hall_one"}
+	hallway_far_before_office := &GameGraphNode{RoomID: 100, AliasName: "hallway_far_before_office"}
+	hallway_close_before_office := &GameGraphNode{RoomID: 100, AliasName: "hallway_close_before_office"}
 
-	middle_hall_two.AddNext(middle_hall_one)
+	// Toy routes:
+	// toy_bonnie: toy_stage -> rhs_party_one -> rhs_party_two -> p2_rhs_hall -> hall_close -> office
+	// toy_chica:  toy_stage -> lhs_party -> lhs_party_two -> p2_lhs_hall -> hall_close -> office
+	// toy_freddy: toy_stage -> hall_far -> hall_close -> office
+	// toy_foxy:   toy_stage -> middle_hall_two(circus) -> rhs_party_two -> hall_close -> office
+	rhs_party_one.AddNext(rhs_party_two)
+	rhs_party_two.AddNext(rhs_hall)
+	rhs_hall.AddNext(hallway_close_before_office)
+	lhs_party.AddNext(lhs_party_two)
+	lhs_party_two.AddNext(lhs_hall)
+	lhs_hall.AddNext(hallway_close_before_office)
+	middle_hall_two.AddNext(rhs_party_two)
+	// Keep these rooms reachable for checks/cameras, then merge into hall_far.
 	middle_hall_one.AddNext(middle_door)
-
-	rhs_hall.AddNext(rhs_party_one, rhs_party_two, middle_hall_two)
-	rhs_party_one.AddNext(rhs_vent, middle_door)
-	rhs_party_two.AddNext(rhs_vent, middle_door)
-	lhs_repair.AddNext(lhs_party, lhs_party_two, middle_hall_two)
-	lhs_party.AddNext(lhs_vent, middle_door)
-	lhs_party_two.AddNext(lhs_vent, middle_door)
-	middle_door.AddNext(p2_office)
-	rhs_vent.AddNext(p2_office)
-	lhs_vent.AddNext(p2_office)
+	middle_door.AddNext(hallway_far_before_office)
+	rhs_vent.AddNext(hallway_far_before_office)
+	lhs_vent.AddNext(hallway_far_before_office)
+	hallway_far_before_office.AddNext(hallway_close_before_office)
+	hallway_close_before_office.AddNext(p2_office)
 
 	mangle_room := &GameGraphNode{RoomID: 100, AliasName: "p2_mangle_room"}
 	toy_stage := &GameGraphNode{RoomID: 100, AliasName: "toy_stage"}
-	toy_stage.AddNext(rhs_hall)
-	mangle_room.AddNext(rhs_hall)
+	toy_stage.AddNext(rhs_party_one, lhs_party, hallway_far_before_office, middle_hall_two)
+	mangle_room.AddNext(middle_hall_one, lhs_repair)
+	lhs_repair.AddNext(lhs_party)
 
 	facade_stage := &GameGraphNode{RoomID: 100, AliasName: "facade"}
 	facade_stage.AddNext(toy_stage, mangle_room)
@@ -214,7 +228,11 @@ type GameState struct {
 func (gs *GameState) SpawnEntities() {
 	// Standard entities in P1 graph
 	freddy := Entity{Id: 1, Name: "freddy", PreferredNextIndex: 1}
-	bonnie := Entity{Id: 2, Name: "bonnie", PreferredNextIndex: 0}
+	// Bonnie path: stage -> party_room -> repair -> lhs_hall -> lhs_closet
+	// At party_room, index 2 is repair.
+	bonnie := Entity{Id: 2, Name: "bonnie", PreferredNextIndex: 2}
+	// Chica path: stage -> party_room -> rhs_hall -> rhs_closet
+	// At party_room, index 1 is rhs_hall.
 	chica := Entity{Id: 3, Name: "chica", PreferredNextIndex: 1}
 	foxy := Entity{Id: 4, Name: "foxy", PreferredNextIndex: 0}
 
@@ -224,10 +242,10 @@ func (gs *GameState) SpawnEntities() {
 	gs.Tracker.AddEntity(foxy, gs.P1Graph.NextNodes[0]) // party_room
 
 	// Toy entities in P2 graph at toy_stage
-	toy_freddy := Entity{Id: 11, Name: "toy_freddy", PreferredNextIndex: 1}
+	toy_freddy := Entity{Id: 11, Name: "toy_freddy", PreferredNextIndex: 2}
 	toy_bonnie := Entity{Id: 12, Name: "toy_bonnie", PreferredNextIndex: 0}
 	toy_chica := Entity{Id: 13, Name: "toy_chica", PreferredNextIndex: 1}
-	toy_foxy := Entity{Id: 14, Name: "toy_foxy", PreferredNextIndex: 0}
+	toy_foxy := Entity{Id: 14, Name: "toy_foxy", PreferredNextIndex: 3}
 
 	toy_stage := FindNodeByAlias(gs.P2Graph, "toy_stage")
 	gs.Tracker.AddEntity(toy_freddy, toy_stage)
@@ -243,9 +261,20 @@ func NewGameState() *GameState {
 	p1_lhs := FindNodeByAlias(p1, "lhs_door")
 	p1_office := FindNodeByAlias(p1, "player_one_office")
 	p2_office := FindNodeByAlias(p2, "player_two_office")
-	p2_vent := FindNodeByAlias(p2, "rhs_vent")
-	p1_office.AddNext(p2_vent)
-	p2_office.AddNext(p1_lhs)
+	// Cross-map entry can vary as P2 routes are tuned; choose first reachable fallback.
+	p2_entry := FindNodeByAlias(p2, "rhs_vent")
+	if p2_entry == nil {
+		p2_entry = FindNodeByAlias(p2, "hallway_far_before_office")
+	}
+	if p2_entry == nil {
+		p2_entry = FindNodeByAlias(p2, "toy_stage")
+	}
+	if p1_office != nil {
+		p1_office.AddNext(p2_entry)
+	}
+	if p2_office != nil {
+		p2_office.AddNext(p1_lhs)
+	}
 
 	tracker := NewEntityTracker()
 
@@ -265,9 +294,26 @@ func (gs *GameState) Step(lobbyID string) {
 		log.Printf("[lobby %s]   entity %d at %s", lobbyID, id, node.AliasName)
 	}
 	gs.Time++
-	for _, node := range gs.Tracker.EntityPositions {
+	entityIDs := make([]int16, 0, len(gs.Tracker.EntityPositions))
+	for id := range gs.Tracker.EntityPositions {
+		entityIDs = append(entityIDs, id)
+	}
+	for _, id := range entityIDs {
+		node := gs.Tracker.EntityPositions[id]
+		if node == nil {
+			continue
+		}
+		var current Entity
+		found := false
 		for _, entity := range node.Entities {
-			gs.Tracker.MoveEntity(entity)
+			if entity.Id == id {
+				current = entity
+				found = true
+				break
+			}
+		}
+		if found {
+			gs.Tracker.MoveEntity(current)
 		}
 	}
 	log.Printf("[lobby %s] sim Step — positions after move:", lobbyID)
@@ -372,6 +418,18 @@ func (gs *GameState) CheckEntityInPlayerRoom(entityID int16, lobbyID string) (in
 	default:
 		return true, roomAlias, true
 	}
+}
+
+func (gs *GameState) AnyEntityInRoom(alias string) bool {
+	if gs == nil || gs.Tracker == nil {
+		return false
+	}
+	for _, node := range gs.Tracker.EntityPositions {
+		if node != nil && node.AliasName == alias {
+			return true
+		}
+	}
+	return false
 }
 
 func main1() {

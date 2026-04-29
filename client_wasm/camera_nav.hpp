@@ -114,7 +114,7 @@ inline constexpr SecurityCamera kPlayerOne[] = {
 
 inline constexpr SecurityCamera kPlayerTwo[] = {
     {"2F LHS",
-     "lhs_party",
+     "p2_lhs_hall",
      PbrLightId::SecondFloorLHS,
      {-2.0f, 51.5f, -3.0f},
      {-10.0f, 50.5f, -3.0f},

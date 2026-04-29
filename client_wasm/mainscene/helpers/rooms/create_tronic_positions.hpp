@@ -71,15 +71,19 @@ inline std::string tronic_3d_pos_key(int entity_id, const char* sim_room_alias) 
       return "p2_toy_stage";
     if (a == "lhs_party")
       return "p2_lhs_party";
+    if (a == "lhs_party_two")
+      return "p2_lhs_party_two";
     if (a == "lhs_repair")
       return "p2_lhs_repair";
-    if (a == "rhs_party")
-      return "p2_rhs_party";
-    if (a == "rhs_hall")
+    if (a == "rhs_party_one")
+      return "p2_rhs_party_one";
+    if (a == "rhs_party_two")
+      return "p2_rhs_party_two";
+    if (a == "p2_rhs_hall")
       return "p2_rhs_hall";
     if (a == "middle_hall_two" || a == "middle_hall_one" || a == "center_door" ||
         a == "facade" || a == "lhs_vent" || a == "rhs_vent" ||
-        a == "player_two_office" || a == "player_one_office")
+        a == "player_two_office" || a == "p2_mangle_room")
       return "p2_" + a;
   }
   return a;
@@ -91,16 +95,20 @@ inline TronicPositionMap make_tronic_layout(const Model& model) {
   m.set_position_map(
       {{"stage", {{-1.0f, 4.25f, -42.0f}, {0, 1, 0}, 0.0f}},
        {"party_room", {{-2.0f, 3.0f, -30.0f}, {0, 1, 0}, 45.0f}},
-       {"lhs_hall", {{-6.0f, 3.0f, -17.0f}, {0, 1, 0}, 0.0f}},
-       {"rhs_hall", {{4.0f, 4.5f, -18.0f}, {0, 1, 0}, 0.0f}},
+       {"repair", {{-20.0f, 3.0f, -32.0f}, {0, 1, 0}, 0.0f}},
+       {"bathrooms", {{16.5f, 3.0f, -30.0f}, {0, 1, 0}, 0.0f}},
+       {"lhs_hall", {{-4.5f, 2.5f, -14.0f}, {0, 1, 0}, 0.0f}},
+       {"rhs_hall", {{4.0f, 2.5f, -14.0f}, {0, 1, 0}, 0.0f}},
 
-       {"lhs_closet", {{-3.5f, 3.0f, 2.5f}, {0, 1, 0}, 0.0f}},
-       {"rhs_closet", {{3.5f, 3.0f, 2.5f}, {0, 1, 0}, 0.0f}},
+       {"lhs_closet", {{-3.5f, 2.5f, 3.5f}, {0, 1, 0}, 180.0f}},
+       {"rhs_closet", {{3.5f, 2.5f, 3.5f}, {0, 1, 0}, 180.0f}},
 
        {"p2_lhs_party", {{-8.0f, 52.0f, -12.0f}, {0, 1, 0}, 0.0f}},
+       {"p2_lhs_party_two", {{-8.0f, 52.0f, -10.0f}, {0, 1, 0}, 0.0f}},
        {"p2_rhs_hall", {{2.0f, 52.0f, -8.0f}, {0, 1, 0}, 0.0f}},
        {"p2_lhs_repair", {{-7.0f, 52.0f, -26.0f}, {0, 1, 0}, 0.0f}},
-       {"p2_rhs_party", {{8.0f, 52.0f, -12.0f}, {0, 1, 0}, 0.0f}},
+       {"p2_rhs_party_one", {{8.0f, 52.0f, -24.0f}, {0, 1, 0}, 0.0f}},
+       {"p2_rhs_party_two", {{8.0f, 52.0f, -12.0f}, {0, 1, 0}, 0.0f}},
        {"p2_middle_hall_two", {{28.0f, 52.0f, -22.0f}, {0, 1, 0}, 0.0f}},
        {"p2_toy_stage", {{33.0f, 52.0f, -37.0f}, {0, 1, 0}, 0.0f}},
        {"toy_stage", {{0.0f, 0.0f, 0.0f}, {0, 1, 0}, 0.0f}}});

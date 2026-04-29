@@ -117,6 +117,8 @@ func CreateInitialMap(NightNum int16) *GameGraphNode {
 	rhs_hall := &GameGraphNode{RoomID: 13, AliasName: "rhs_hall"}
 
 	party_room := &GameGraphNode{RoomID: 2, AliasName: "party_room"}
+	repair := &GameGraphNode{RoomID: 6, AliasName: "repair"}
+	bathrooms := &GameGraphNode{RoomID: 7, AliasName: "bathrooms"}
 	stage := &GameGraphNode{RoomID: 1, AliasName: "stage"}
 
 	lhs_door.AddNext(p1_office)
@@ -127,7 +129,9 @@ func CreateInitialMap(NightNum int16) *GameGraphNode {
 	rhs_closet.AddNext(rhs_door)
 	rhs_hall.AddNext(rhs_closet)
 
-	party_room.AddNext(lhs_hall, rhs_hall)
+	party_room.AddNext(lhs_hall, rhs_hall, repair, bathrooms)
+	repair.AddNext(lhs_hall)
+	bathrooms.AddNext(rhs_hall)
 	stage.AddNext(party_room)
 
 	return stage
@@ -138,11 +142,13 @@ func CreateP2Map(NightNum int16) *GameGraphNode {
 
 	lhs_vent := &GameGraphNode{RoomID: 100, AliasName: "lhs_vent"}
 	lhs_party := &GameGraphNode{RoomID: 100, AliasName: "lhs_party"}
+	lhs_party_two := &GameGraphNode{RoomID: 100, AliasName: "lhs_party_two"}
 	lhs_repair := &GameGraphNode{RoomID: 100, AliasName: "lhs_repair"}
 
 	rhs_vent := &GameGraphNode{RoomID: 100, AliasName: "rhs_vent"}
-	rhs_party := &GameGraphNode{RoomID: 100, AliasName: "rhs_party"}
-	rhs_hall := &GameGraphNode{RoomID: 100, AliasName: "rhs_hall"}
+	rhs_party_one := &GameGraphNode{RoomID: 100, AliasName: "rhs_party_one"}
+	rhs_party_two := &GameGraphNode{RoomID: 100, AliasName: "rhs_party_two"}
+	rhs_hall := &GameGraphNode{RoomID: 100, AliasName: "p2_rhs_hall"}
 
 	middle_door := &GameGraphNode{RoomID: 100, AliasName: "center_door"}
 	middle_hall_two := &GameGraphNode{RoomID: 100, AliasName: "middle_hall_two"}
@@ -151,15 +157,17 @@ func CreateP2Map(NightNum int16) *GameGraphNode {
 	middle_hall_two.AddNext(middle_hall_one)
 	middle_hall_one.AddNext(middle_door)
 
-	rhs_hall.AddNext(rhs_party, middle_hall_two)
-	rhs_party.AddNext(rhs_vent, middle_door)
-	lhs_repair.AddNext(lhs_party, middle_hall_two)
+	rhs_hall.AddNext(rhs_party_one, rhs_party_two, middle_hall_two)
+	rhs_party_one.AddNext(rhs_vent, middle_door)
+	rhs_party_two.AddNext(rhs_vent, middle_door)
+	lhs_repair.AddNext(lhs_party, lhs_party_two, middle_hall_two)
 	lhs_party.AddNext(lhs_vent, middle_door)
+	lhs_party_two.AddNext(lhs_vent, middle_door)
 	middle_door.AddNext(p2_office)
 	rhs_vent.AddNext(p2_office)
 	lhs_vent.AddNext(p2_office)
 
-	mangle_room := &GameGraphNode{RoomID: 100, AliasName: "player_one_office"}
+	mangle_room := &GameGraphNode{RoomID: 100, AliasName: "p2_mangle_room"}
 	toy_stage := &GameGraphNode{RoomID: 100, AliasName: "toy_stage"}
 	toy_stage.AddNext(rhs_hall)
 	mangle_room.AddNext(rhs_hall)

@@ -143,7 +143,7 @@ func removeEntity(entities []Entity, id int16) []Entity {
 
 func isSingleOccupancyChoke(alias string) bool {
 	switch alias {
-	case "lhs_door", "rhs_door", "hallway_close_before_office":
+	case "lhs_door", "rhs_door", "hallway_close_before_office", "lhs_vent", "rhs_vent":
 		return true
 	default:
 		return false

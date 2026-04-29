@@ -42,6 +42,7 @@ class MainScene : public Scene {
   bool debug_tronic_coords_ = false;
   bool left_door_closed_ = false;
   bool right_door_closed_ = false;
+  bool p2_mask_down_ = false;
   float left_door_y_ = 6.5f;
   float right_door_y_ = 6.5f;
 
@@ -179,12 +180,26 @@ class MainScene : public Scene {
               EMSCRIPTEN_WEBSOCKET_T& socket) override {
     (void)curr_scene;
     mainscene::process_check_camera_restore(state, camera_nav_);
-    mainscene::process_camera_panel_toggle(camera_nav_, state.is_player_one);
-    mainscene::try_send_check_camera_room(state, camera_nav_, socket);
+    const bool p2_cam_blocked = !state.is_player_one && p2_mask_down_;
+    if (!p2_cam_blocked) {
+      mainscene::process_camera_panel_toggle(camera_nav_, state.is_player_one);
+      mainscene::try_send_check_camera_room(state, camera_nav_, socket);
+    } else {
+      camera_nav_.panel_open = false;
+      camera_nav_.active_feed = -1;
+    }
     if (IsKeyPressed(KEY_L))
       debug_tronic_coords_ = !debug_tronic_coords_;
     if (state.gameStarted && IsKeyPressed(KEY_T))
       ws::send_step(socket);
+    if (state.gameStarted && !state.is_player_one && IsKeyPressed(KEY_Q)) {
+      p2_mask_down_ = !p2_mask_down_;
+      ws::send_mask_state(socket, p2_mask_down_);
+      if (p2_mask_down_) {
+        camera_nav_.panel_open = false;
+        camera_nav_.active_feed = -1;
+      }
+    }
     if (state.gameStarted && state.is_player_one) {
       const bool prev_left = left_door_closed_;
       const bool prev_right = right_door_closed_;

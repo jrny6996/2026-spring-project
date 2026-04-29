@@ -44,6 +44,8 @@ type GameRoomState struct {
 	Power           int        `json:"power"`
 	LHSDoorDown     bool       `json:"lhsDoorDown"`
 	RHSDoorDown     bool       `json:"rhsDoorDown"`
+	P2MaskDown      bool       `json:"p2MaskDown"`
+	P2OfficeDanger  int        `json:"p2OfficeDanger"`
 	Rooms           []Room     `json:"rooms"`
 	HostIsPlayerOne bool       `json:"-"`
 	Sim             *GameState `json:"-"`
@@ -163,6 +165,19 @@ func isPlayerOneUser(room *GameRoomState, remote string) bool {
 	}
 	if remote == room.Acceptor {
 		return !room.HostIsPlayerOne
+	}
+	return false
+}
+
+func isPlayerTwoUser(room *GameRoomState, remote string) bool {
+	if room == nil {
+		return false
+	}
+	if remote == room.Host {
+		return !room.HostIsPlayerOne
+	}
+	if remote == room.Acceptor {
+		return room.HostIsPlayerOne
 	}
 	return false
 }
@@ -307,14 +322,16 @@ func main() {
 
 func newGameRoomState(host string) GameRoomState {
 	return GameRoomState{
-		Time:        0,
-		Started:     false,
-		Host:        host,
-		Accepted:    false,
-		Acceptor:    "",
-		Power:       30,
-		LHSDoorDown: false,
-		RHSDoorDown: false,
+		Time:           0,
+		Started:        false,
+		Host:           host,
+		Accepted:       false,
+		Acceptor:       "",
+		Power:          30,
+		LHSDoorDown:    false,
+		RHSDoorDown:    false,
+		P2MaskDown:     false,
+		P2OfficeDanger: 0,
 		Rooms: []Room{
 			{
 				EntityID:   0,
@@ -418,6 +435,8 @@ func handleStartGame(conn *websocket.Conn, r *http.Request) {
 	room.Power = 30
 	room.LHSDoorDown = false
 	room.RHSDoorDown = false
+	room.P2MaskDown = false
+	room.P2OfficeDanger = 0
 	room.Sim = NewGameState()
 	room.Sim.SpawnEntities()
 	log.Printf("lobby %s: SpawnEntities done, sim ready", user.LobbyID)
@@ -456,6 +475,20 @@ func handleStepGame(conn *websocket.Conn, r *http.Request) {
 		handleLobbyLose(user.LobbyID, killer)
 		return
 	}
+	if room.Sim.AnyEntityInRoom("player_two_office") {
+		if room.P2MaskDown {
+			room.P2OfficeDanger = 0
+		} else {
+			room.P2OfficeDanger++
+			if room.P2OfficeDanger >= 2 {
+				killer, _ := room.Sim.FirstEntityNameInRoom("player_two_office")
+				handleLobbyLose(user.LobbyID, killer)
+				return
+			}
+		}
+	} else {
+		room.P2OfficeDanger = 0
+	}
 	broadcastStateToLobby(user.LobbyID)
 
 	if int(room.Time) > NIGHT_IN_MINUTES*60 {
@@ -472,28 +505,37 @@ func handleActionGame(conn *websocket.Conn, r *http.Request, content string) {
 	if !exists || !room.Started || room.Sim == nil {
 		return
 	}
-	if !isPlayerOneUser(room, r.RemoteAddr) {
-		return
-	}
-
 	parts := strings.Split(content, ":")
-	if len(parts) != 3 || parts[0] != "door" {
+	if len(parts) != 3 {
 		return
 	}
-	side := parts[1]
-	closed := parts[2] == "closed"
-
-	switch side {
-	case "lhs":
-		room.LHSDoorDown = closed
-		if room.Sim.LHSDoor != nil {
-			room.Sim.LHSDoor.IsBlocked = closed
+	switch parts[0] {
+	case "door":
+		if !isPlayerOneUser(room, r.RemoteAddr) {
+			return
 		}
-	case "rhs":
-		room.RHSDoorDown = closed
-		if room.Sim.RHSDoor != nil {
-			room.Sim.RHSDoor.IsBlocked = closed
+		side := parts[1]
+		closed := parts[2] == "closed"
+		switch side {
+		case "lhs":
+			room.LHSDoorDown = closed
+			if room.Sim.LHSDoor != nil {
+				room.Sim.LHSDoor.IsBlocked = closed
+			}
+		case "rhs":
+			room.RHSDoorDown = closed
+			if room.Sim.RHSDoor != nil {
+				room.Sim.RHSDoor.IsBlocked = closed
+			}
 		}
+	case "mask":
+		if !isPlayerTwoUser(room, r.RemoteAddr) {
+			return
+		}
+		if parts[1] != "p2" {
+			return
+		}
+		room.P2MaskDown = parts[2] == "down"
 	}
 }
 

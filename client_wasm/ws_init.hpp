@@ -64,6 +64,13 @@ inline void send_door_state(EMSCRIPTEN_WEBSOCKET_T socket, const char* side,
   send_json_message(socket, "action", content);
 }
 
+/// Update player-two mask state on server.
+inline void send_mask_state(EMSCRIPTEN_WEBSOCKET_T socket, bool down) {
+  const std::string content =
+      std::string("mask:p2:") + (down ? "down" : "up");
+  send_json_message(socket, "action", content);
+}
+
 inline bool try_parse_json(const char* data, size_t len, json& out) {
   try {
     out = json::parse(std::string(data, len));

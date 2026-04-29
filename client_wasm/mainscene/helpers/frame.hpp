@@ -11,8 +11,6 @@
 #include <cstdio>
 #include <map>
 #include <string>
-#include <vector>
-#include <iostream>
 namespace mainscene {
 
 inline void process_check_camera_restore(GameState& state,
@@ -127,18 +125,12 @@ inline void apply_security_feed_or_office_view(
 
 inline const TronicPosition* tronic_pos_for_room(const TronicPositionMap* tpm,
                                                  const std::string& room_key) {
-
-                                                  std::cout << "TRONIC foudn in room\n";
-  if (!tpm || room_key.empty()){
-    std::cout << "no room key on tronic position map\n";
-    return nullptr;}
+  if (!tpm || room_key.empty())
+    return nullptr;
   auto it = tpm->pos_map.find(room_key);
-  if (it == tpm->pos_map.end()){
-    std::cout << "position could not be found in tpm map\n";
+  if (it == tpm->pos_map.end()) {
     return nullptr;
   }
-
-  std::cout << "IT found\n";
   return &it->second;
 }
 
@@ -215,10 +207,11 @@ inline bool resolve_tronic_draw_transform(
 inline std::size_t draw_tronic_sim_entities(
     const std::vector<SimEntityRow>& sim_entities,
     const std::map<std::string, TronicPositionMap>& tronic_by_entity,
-    const std::vector<Model*>& animatronic_models, const Vector3& default_pos,
+    Model* const* animatronic_models, std::size_t animatronic_model_count,
+    const Vector3& default_pos,
     const Vector3& rotation_axis, const Vector3& anim_scale,
     const char* only_room_alias, bool use_backup_when_pos_missing) {
-  if (animatronic_models.empty())
+  if (animatronic_model_count < 2)
     return 0;
   const Model& default_mesh = *animatronic_models[1];
   const std::map<std::string, int> occupancy =
@@ -235,7 +228,6 @@ inline std::size_t draw_tronic_sim_entities(
       if (ent.room_alias.empty())
         continue;
     }
-    std::cout << ent.name << ent.room_alias<< "\n";
     Vector3 pos{};
     Vector3 ax{};
     float ang = 0.0f;
@@ -280,9 +272,10 @@ inline std::size_t draw_tronic_sim_entities(
 inline std::size_t draw_tronic_sim_entities_matching_debug_hud(
     const std::vector<SimEntityRow>& sim_entities,
     const std::map<std::string, TronicPositionMap>& tronic_by_entity,
-    const std::vector<Model*>& animatronic_models, const Vector3& default_pos,
+    Model* const* animatronic_models, std::size_t animatronic_model_count,
+    const Vector3& default_pos,
     const Vector3& rotation_axis, const Vector3& anim_scale) {
-  if (animatronic_models.empty())
+  if (animatronic_model_count < 2)
     return 0;
   const Model& default_mesh = *animatronic_models[1];
   const std::map<std::string, int> occupancy =
@@ -334,14 +327,15 @@ inline std::size_t draw_tronic_sim_entities_matching_debug_hud(
 
 inline void draw_main_scene_3d(
     CameraNavState& camera_nav, bool is_player_one, const GameState& state,
-    const std::vector<Model*>& animatronic_models, const Vector3& default_pos,
+    Model* const* animatronic_models, std::size_t animatronic_model_count,
+    const Vector3& default_pos,
     const std::map<std::string, TronicPositionMap>& tronic_by_entity,
     const Model& map, const Model& p_map, bool debug_tronic_coords) {
   const Vector3 rotationAxis = {0.0f, 1.0f, 0.0f};
   const Vector3 anim_scale = tronic_draw_scale_for(tronic_by_entity, "freddy",
                                                    {0.05f, 0.05f, 0.05f});
 
-  if (animatronic_models.empty())
+  if (animatronic_model_count < 2)
     return;
   const Model& default_mesh = *animatronic_models[1];
 
@@ -355,10 +349,12 @@ inline void draw_main_scene_3d(
       if (debug_tronic_coords) {
         drawn = draw_tronic_sim_entities_matching_debug_hud(
             state.sim_entities, tronic_by_entity, animatronic_models,
+            animatronic_model_count,
             default_pos, rotationAxis, anim_scale);
       } else {
         drawn = draw_tronic_sim_entities(state.sim_entities, tronic_by_entity,
-                                         animatronic_models, default_pos,
+                                         animatronic_models,
+                                         animatronic_model_count, default_pos,
                                          rotationAxis, anim_scale, nullptr,
                                          false);
       }
@@ -395,6 +391,7 @@ inline void draw_main_scene_3d(
   if (debug_tronic_coords && !state.sim_entities.empty()) {
     if (draw_tronic_sim_entities_matching_debug_hud(
             state.sim_entities, tronic_by_entity, animatronic_models,
+            animatronic_model_count,
             default_pos, rotationAxis, anim_scale) == 0) {
       DrawModelEx(default_mesh, default_pos, rotationAxis, 0.0f, anim_scale,
                   WHITE);
@@ -414,7 +411,8 @@ inline void draw_main_scene_3d(
   }
 
   draw_tronic_sim_entities(state.sim_entities, tronic_by_entity,
-                            animatronic_models, default_pos, rotationAxis,
+                            animatronic_models, animatronic_model_count,
+                            default_pos, rotationAxis,
                             anim_scale, sim_alias, true);
 }
 
@@ -478,12 +476,16 @@ inline void draw_main_scene_2d(Camera& camera, CameraNavState& camera_nav,
                                    tronic_by_entity,
                                const Vector3& tronic_default_pos) {
   camera_nav.DrawPanel(state.is_player_one);
-  std::string x_text = std::to_string(camera.position.x);
-  std::string y_text = std::to_string(camera.position.y);
-  std::string z_text = std::to_string(camera.position.z);
-  DrawText(x_text.c_str(), 10, 10, 16, WHITE);
-  DrawText(y_text.c_str(), 10, 28, 16, WHITE);
-  DrawText(z_text.c_str(), 10, 46, 16, WHITE);
+  char coord_text[64];
+  std::snprintf(coord_text, sizeof(coord_text), "x: %.2f",
+                static_cast<double>(camera.position.x));
+  DrawText(coord_text, 10, 10, 16, WHITE);
+  std::snprintf(coord_text, sizeof(coord_text), "y: %.2f",
+                static_cast<double>(camera.position.y));
+  DrawText(coord_text, 10, 28, 16, WHITE);
+  std::snprintf(coord_text, sizeof(coord_text), "z: %.2f",
+                static_cast<double>(camera.position.z));
+  DrawText(coord_text, 10, 46, 16, WHITE);
   if (state.has_player_slot) {
     const char* label = state.is_player_one ? "Player 1" : "Player 2";
     DrawText(label, 10, 64, 16, WHITE);

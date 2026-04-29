@@ -1,6 +1,7 @@
 #pragma once
 #include <cmath>
 #include <cstdio>
+#include <array>
 #include <string>
 #include "GameState.hpp"
 #include "Scene.hpp"
@@ -35,6 +36,7 @@ class MainScene : public Scene {
   Shader map_shader;
   CameraNavState camera_nav_;
   bool is_freeroam = false;
+  std::array<Model*, 4> animatronic_models_{};
   mainscene::PbrLightGPU
       pbr_lights_[mainscene::kMaxPbrLights];
   int pbr_light_count_ = 0;
@@ -118,6 +120,8 @@ class MainScene : public Scene {
         {this->foxy, {0.048f, 0.048f, 0.048f}, {0.0f, 0.0f, -0.95f}},
     };
     this->tronic_maps_ = create_tronic_positions(tronic_roster);
+    animatronic_models_ = {&this->freddy, &this->bonnie, &this->chica,
+                           &this->foxy};
     this->camera.fovy = 50.0f;
     this->camera.target.x = -1.0f;
     this->camera.target.z = 10.0f;
@@ -169,12 +173,11 @@ class MainScene : public Scene {
 
     mainscene::sync_pbr_shader_frame(map_shader, camera, pbr_lights_,
                                      pbr_light_count_, camPos);
-    const std::vector<Model*> animatronic_models = {&this->freddy, &this->bonnie,
-                                                    &this->chica, &this->foxy};
     BeginDrawing();
     BeginMode3D(this->camera);
     mainscene::draw_main_scene_3d(
-        this->camera_nav_, state.is_player_one, state, animatronic_models,
+        this->camera_nav_, state.is_player_one, state,
+        animatronic_models_.data(), animatronic_models_.size(),
         this->freddyInitialPos, this->tronic_maps_, this->map, this->p_map,
         debug_tronic_coords_);
 

@@ -137,8 +137,12 @@ inline void sync_pbr_shader_frame(Shader& map_shader, Camera& camera,
     pl.target = pl.position;
   }
 
-  SetShaderValue(map_shader, GetShaderLocation(map_shader, "numOfLights"),
-                 &pbr_light_count, SHADER_UNIFORM_INT);
+  static int num_of_lights_loc = -1;
+  if (num_of_lights_loc == -1) {
+    num_of_lights_loc = GetShaderLocation(map_shader, "numOfLights");
+  }
+  SetShaderValue(map_shader, num_of_lights_loc, &pbr_light_count,
+                 SHADER_UNIFORM_INT);
 
   float vp[3] = {camera.position.x, camera.position.y, camera.position.z};
   if (map_shader.locs[SHADER_LOC_VECTOR_VIEW] != -1) {

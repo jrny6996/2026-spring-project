@@ -29,6 +29,7 @@ class MainScene : public Scene {
   Model bonnie;
   Model chica;
   Model foxy;
+  Model door;
   Vector3 freddyInitialPos;
   Camera& camera;
   Shader map_shader;
@@ -41,6 +42,7 @@ class MainScene : public Scene {
   bool debug_tronic_coords_ = false;
 
   void enable_pbr() {
+
     mainscene::setup_pbr_shader_locs(map_shader);
     mainscene::setup_pbr_shader_uniform_defaults(map_shader);
     mainscene::init_all_scene_pbr_lights(map_shader, pbr_lights_,
@@ -51,6 +53,12 @@ class MainScene : public Scene {
     mainscene::assign_pbr_to_model(map_shader, bonnie);
     mainscene::assign_pbr_to_model(map_shader, chica);
     mainscene::assign_pbr_to_model(map_shader, foxy);
+    mainscene::assign_pbr_to_model(map_shader, door);
+  }
+  void draw_doors(){
+     DrawModel(door,{0.0f, 2.5f, -2.5f}, 1.0f, WHITE);
+          DrawModel(door,{0.0f, 2.5f, 2.5f}, 1.0f, WHITE);
+
   }
 
  public:
@@ -68,6 +76,7 @@ class MainScene : public Scene {
     static constexpr const char* kMap2Path = "assets/fnaf_2_hw_map_updated.glb";
     static constexpr const char* kPbrVsPath = "assets/shaders/glsl100/pbr.vs";
     static constexpr const char* kPbrFsPath = "assets/shaders/glsl100/pbr.fs";
+    static constexpr const char* kDoorPath = "assets/door.glb";
 
     SceneAssetPreloader preloader;
     preloader.PreloadAll({kFreddyPath, kBonniePath, kChicaPath, kFoxyPath,
@@ -81,6 +90,7 @@ class MainScene : public Scene {
     this->foxy = LoadModel(kFoxyPath);
     this->map = LoadModel(kMap1Path);
     this->p_map = LoadModel(kMap2Path);
+    this->door = LoadModel(kDoorPath);
     for (int i = 0; i < this->map.materialCount; i++) {
       if (this->map.materials[i].maps[MATERIAL_MAP_DIFFUSE].texture.id == 0) {
         printf("Missing texture on material %d\n", i);
@@ -167,6 +177,9 @@ class MainScene : public Scene {
         this->camera_nav_, state.is_player_one, state, animatronic_models,
         this->freddyInitialPos, this->tronic_maps_, this->map, this->p_map,
         debug_tronic_coords_);
+
+
+    this->draw_doors();
     EndMode3D();
     mainscene::draw_main_scene_2d(this->camera, camera_nav_, state,
                                     debug_tronic_coords_, this->tronic_maps_,

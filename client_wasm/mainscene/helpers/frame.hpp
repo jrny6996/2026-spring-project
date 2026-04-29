@@ -23,7 +23,7 @@ inline void process_check_camera_restore(GameState& state,
 
 inline void process_camera_panel_toggle(CameraNavState& camera_nav,
                                         bool is_player_one) {
-  if (IsKeyPressed(KEY_B))
+  if (IsKeyPressed(KEY_S))
     camera_nav.TogglePanel(is_player_one);
 }
 

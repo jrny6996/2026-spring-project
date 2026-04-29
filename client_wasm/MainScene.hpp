@@ -1,22 +1,21 @@
 #pragma once
+#include <array>
 #include <cmath>
 #include <cstdio>
-#include <array>
+#include <map>
 #include <string>
+#include <vector>
 #include "GameState.hpp"
 #include "Scene.hpp"
 #include "asset_preload.hpp"
 #include "camera_nav.hpp"
-#include "pbr_light_ids.hpp"
-#include "raylib.h"
-#include <map>
-#include <string>
 #include "mainscene/helpers/camera_control.hpp"
 #include "mainscene/helpers/frame.hpp"
 #include "mainscene/helpers/pbr_lights.hpp"
 #include "mainscene/helpers/rooms/create_tronic_positions.hpp"
+#include "pbr_light_ids.hpp"
+#include "raylib.h"
 #include "ws_init.hpp"
-#include <vector>
 Vector3 camPos = {0.0f, 5.0f, 0.0f};
 float yaw = PI;
 float pitch = 0.0f;
@@ -37,18 +36,25 @@ class MainScene : public Scene {
   CameraNavState camera_nav_;
   bool is_freeroam = false;
   std::array<Model*, 4> animatronic_models_{};
-  mainscene::PbrLightGPU
-      pbr_lights_[mainscene::kMaxPbrLights];
+  mainscene::PbrLightGPU pbr_lights_[mainscene::kMaxPbrLights];
   int pbr_light_count_ = 0;
   std::map<std::string, TronicPositionMap> tronic_maps_;
   bool debug_tronic_coords_ = false;
+  bool left_door_closed_ = false;
+  bool right_door_closed_ = false;
+  float left_door_y_ = 6.5f;
+  float right_door_y_ = 6.5f;
+
+  static constexpr float kDoorYDown = 2.5f;
+  static constexpr float kDoorYUp = 6.5f;
+  static constexpr float kDoorMoveSpeed = 8.0f;
 
   void enable_pbr() {
 
     mainscene::setup_pbr_shader_locs(map_shader);
     mainscene::setup_pbr_shader_uniform_defaults(map_shader);
     mainscene::init_all_scene_pbr_lights(map_shader, pbr_lights_,
-                                        pbr_light_count_);
+                                         pbr_light_count_);
     mainscene::assign_pbr_to_model(map_shader, map);
     mainscene::assign_pbr_to_model(map_shader, p_map);
     mainscene::assign_pbr_to_model(map_shader, freddy);
@@ -57,10 +63,34 @@ class MainScene : public Scene {
     mainscene::assign_pbr_to_model(map_shader, foxy);
     mainscene::assign_pbr_to_model(map_shader, door);
   }
-  void draw_doors(){
-     DrawModel(door,{0.0f, 2.5f, -2.5f}, 1.0f, WHITE);
-          DrawModel(door,{0.0f, 2.5f, 2.5f}, 1.0f, WHITE);
+  void update_doors() {
+    if (IsKeyPressed(KEY_Q))
+      left_door_closed_ = !left_door_closed_;
+    if (IsKeyPressed(KEY_E))
+      right_door_closed_ = !right_door_closed_;
 
+    const float dt = GetFrameTime();
+    const float step = kDoorMoveSpeed * dt;
+
+    const float left_target = left_door_closed_ ? kDoorYDown : kDoorYUp;
+    const float right_target = right_door_closed_ ? kDoorYDown : kDoorYUp;
+
+    if (left_door_y_ < left_target) {
+      left_door_y_ = fminf(left_door_y_ + step, left_target);
+    } else if (left_door_y_ > left_target) {
+      left_door_y_ = fmaxf(left_door_y_ - step, left_target);
+    }
+
+    if (right_door_y_ < right_target) {
+      right_door_y_ = fminf(right_door_y_ + step, right_target);
+    } else if (right_door_y_ > right_target) {
+      right_door_y_ = fmaxf(right_door_y_ - step, right_target);
+    }
+  }
+
+  void draw_doors() {
+    DrawModel(door, {-4.0f, left_door_y_, -2.5f}, 1.0f, WHITE);
+    DrawModel(door, {0.0f, right_door_y_, -2.5f}, 1.0f, WHITE);
   }
 
  public:
@@ -72,8 +102,7 @@ class MainScene : public Scene {
     static constexpr const char* kBonniePath =
         "assets/fnaf_1_bonnie_by_thudner.glb";
     static constexpr const char* kChicaPath = "assets/chica.glb";
-    static constexpr const char* kFoxyPath =
-        "assets/rynfox_fnaf_1_foxy_v6.glb";
+    static constexpr const char* kFoxyPath = "assets/rynfox_fnaf_1_foxy_v6.glb";
     static constexpr const char* kMap1Path = "assets/fnaf_1_hw_map.glb";
     static constexpr const char* kMap2Path = "assets/fnaf_2_hw_map_updated.glb";
     static constexpr const char* kPbrVsPath = "assets/shaders/glsl100/pbr.vs";
@@ -81,9 +110,9 @@ class MainScene : public Scene {
     static constexpr const char* kDoorPath = "assets/door.glb";
 
     SceneAssetPreloader preloader;
-    preloader.PreloadAll({kFreddyPath, kBonniePath, kChicaPath, kFoxyPath,
-                          kMap1Path, kMap2Path},
-                         {kPbrVsPath, kPbrFsPath});
+    preloader.PreloadAll(
+        {kFreddyPath, kBonniePath, kChicaPath, kFoxyPath, kMap1Path, kMap2Path},
+        {kPbrVsPath, kPbrFsPath});
     preloader.BeginServe();
 
     this->freddy = LoadModel(kFreddyPath);
@@ -128,8 +157,8 @@ class MainScene : public Scene {
   }
 
   bool set_pbr_light_enabled(int index, bool enabled) {
-    return mainscene::set_pbr_light_enabled(
-        pbr_lights_, pbr_light_count_, index, enabled);
+    return mainscene::set_pbr_light_enabled(pbr_lights_, pbr_light_count_,
+                                            index, enabled);
   }
 
   bool pbr_light_enabled(PbrLightId id) const {
@@ -154,12 +183,13 @@ class MainScene : public Scene {
     mainscene::try_send_check_camera_room(state, camera_nav_, socket);
     if (IsKeyPressed(KEY_L))
       debug_tronic_coords_ = !debug_tronic_coords_;
+    update_doors();
 
     mainscene::clamp_and_apply_pbr_for_security_feed(
         state, camera_nav_, pbr_lights_, pbr_light_count_);
 
     mainscene::apply_player_two_default_campos(state.is_player_one, is_freeroam,
-                                                camPos);
+                                               camPos);
 
     if (is_freeroam) {
       mainscene::apply_free_cam_move(camPos, yaw, is_freeroam);
@@ -167,26 +197,24 @@ class MainScene : public Scene {
 
     ClearBackground(BLACK);
 
-    mainscene::apply_security_feed_or_office_view(
-        this->camera, camera_nav_, state.is_player_one, camPos, yaw, pitch,
-        is_freeroam);
+    mainscene::apply_security_feed_or_office_view(this->camera, camera_nav_,
+                                                  state.is_player_one, camPos,
+                                                  yaw, pitch, is_freeroam);
 
     mainscene::sync_pbr_shader_frame(map_shader, camera, pbr_lights_,
                                      pbr_light_count_, camPos);
     BeginDrawing();
     BeginMode3D(this->camera);
-    mainscene::draw_main_scene_3d(
-        this->camera_nav_, state.is_player_one, state,
-        animatronic_models_.data(), animatronic_models_.size(),
-        this->freddyInitialPos, this->tronic_maps_, this->map, this->p_map,
-        debug_tronic_coords_);
-
-
-    this->draw_doors();
+    mainscene::draw_main_scene_3d(this->camera_nav_, state.is_player_one, state,
+                                  animatronic_models_.data(),
+                                  animatronic_models_.size(),
+                                  this->freddyInitialPos, this->tronic_maps_,
+                                  this->map, this->p_map, debug_tronic_coords_);
+  if(state.is_player_one)      this->draw_doors();
     EndMode3D();
     mainscene::draw_main_scene_2d(this->camera, camera_nav_, state,
-                                    debug_tronic_coords_, this->tronic_maps_,
-                                    this->freddyInitialPos);
+                                  debug_tronic_coords_, this->tronic_maps_,
+                                  this->freddyInitialPos);
     EndDrawing();
   }
 

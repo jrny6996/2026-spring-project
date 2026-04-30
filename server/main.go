@@ -46,6 +46,8 @@ type GameRoomState struct {
 	RHSDoorDown     bool       `json:"rhsDoorDown"`
 	P2MaskDown      bool       `json:"p2MaskDown"`
 	P2OfficeDanger  int        `json:"p2OfficeDanger"`
+	P1Lost          bool       `json:"-"`
+	P2Lost          bool       `json:"-"`
 	Rooms           []Room     `json:"rooms"`
 	HostIsPlayerOne bool       `json:"-"`
 	Sim             *GameState `json:"-"`
@@ -154,6 +156,71 @@ func handleLobbyLose(lobbyID string, killer string) {
 		u.WriteMu.Unlock()
 	}
 	cleanupLobby(lobbyID)
+}
+
+func handlePlayerTwoLose(lobbyID string, killer string) {
+	room, ok := lobbySet[lobbyID]
+	if !ok || room == nil {
+		return
+	}
+	// Hard invariant: when server believes P2 mask is down, P2 cannot die.
+	if room.P2MaskDown {
+		log.Printf("lobby %s: suppressed P2 lose (killer=%s) because mask is down", lobbyID, killer)
+		return
+	}
+	room.P2Lost = true
+	for _, u := range connectedUsersSet {
+		if u == nil || u.LobbyID != lobbyID || u.Conn == nil {
+			continue
+		}
+		if !isPlayerTwoUser(room, u.Remote) {
+			continue
+		}
+		u.WriteMu.Lock()
+		status := "lose"
+		if killer != "" {
+			status = "lose:" + killer
+		}
+		_ = u.Conn.WriteJSON(Message{Type: "status", Data: status})
+		_ = u.Conn.Close()
+		u.Conn = nil
+		u.WriteMu.Unlock()
+		// Keep the lobby alive for P1; this slot can reconnect/rejoin later.
+		u.LobbyID = ""
+	}
+	if room.P1Lost && room.P2Lost {
+		cleanupLobby(lobbyID)
+	}
+}
+
+func handlePlayerOneLose(lobbyID string, killer string) {
+	room, ok := lobbySet[lobbyID]
+	if !ok || room == nil {
+		return
+	}
+	room.P1Lost = true
+	for _, u := range connectedUsersSet {
+		if u == nil || u.LobbyID != lobbyID || u.Conn == nil {
+			continue
+		}
+		if !isPlayerOneUser(room, u.Remote) {
+			continue
+		}
+		u.WriteMu.Lock()
+		status := "lose"
+		if killer != "" {
+			status = "lose:" + killer
+		}
+		_ = u.Conn.WriteJSON(Message{Type: "status", Data: status})
+		_ = u.Conn.Close()
+		u.Conn = nil
+		u.WriteMu.Unlock()
+		// Keep the lobby alive for P2; this slot can reconnect/rejoin later.
+		u.LobbyID = ""
+	}
+	if room.P1Lost && room.P2Lost {
+		cleanupLobby(lobbyID)
+	}
 }
 
 func isPlayerOneUser(room *GameRoomState, remote string) bool {
@@ -437,6 +504,8 @@ func handleStartGame(conn *websocket.Conn, r *http.Request) {
 	room.RHSDoorDown = false
 	room.P2MaskDown = false
 	room.P2OfficeDanger = 0
+	room.P1Lost = false
+	room.P2Lost = false
 	room.Sim = NewGameState()
 	room.Sim.SpawnEntities()
 	log.Printf("lobby %s: SpawnEntities done, sim ready", user.LobbyID)
@@ -472,18 +541,23 @@ func handleStepGame(conn *websocket.Conn, r *http.Request) {
 	room.Sim.Step(user.LobbyID)
 	if room.Sim.AnyEntityInRoom("player_one_office") {
 		killer, _ := room.Sim.FirstEntityNameInRoom("player_one_office")
-		handleLobbyLose(user.LobbyID, killer)
-		return
+		handlePlayerOneLose(user.LobbyID, killer)
 	}
 	if room.Sim.AnyEntityInRoom("player_two_office") {
 		if room.P2MaskDown {
+			// Masked P2 immediately repels office intruders.
 			room.P2OfficeDanger = 0
+			room.Sim.MoveEntitiesBackFromRoom("player_two_office")
 		} else {
+			// Require sustained unmasked office danger before P2 loses.
+			// This absorbs one-tick ordering jitter between "mask down" input
+			// and step processing so P2 doesn't die on a transient race.
 			room.P2OfficeDanger++
 			if room.P2OfficeDanger >= 2 {
 				killer, _ := room.Sim.FirstEntityNameInRoom("player_two_office")
-				handleLobbyLose(user.LobbyID, killer)
-				return
+				handlePlayerTwoLose(user.LobbyID, killer)
+				room.P2OfficeDanger = 0
+				room.Sim.MoveEntitiesBackFromRoom("player_two_office")
 			}
 		}
 	} else {
@@ -530,13 +604,21 @@ func handleActionGame(conn *websocket.Conn, r *http.Request, content string) {
 		}
 	case "mask":
 		if !isPlayerTwoUser(room, r.RemoteAddr) {
+			log.Printf("lobby %s: ignored mask action from non-P2 remote=%s content=%q", user.LobbyID, r.RemoteAddr, content)
 			return
 		}
 		if parts[1] != "p2" {
 			return
 		}
 		room.P2MaskDown = parts[2] == "down"
+		log.Printf("lobby %s: p2 mask set to %v by remote=%s", user.LobbyID, room.P2MaskDown, r.RemoteAddr)
+		// If mask goes down after an entry race, immediately deflect office occupants.
+		if room.P2MaskDown && room.Sim.AnyEntityInRoom("player_two_office") {
+			room.P2OfficeDanger = 0
+			room.Sim.MoveEntitiesBackFromRoom("player_two_office")
+		}
 	}
+	broadcastStateToLobby(user.LobbyID)
 }
 
 func cleanupLobby(lobbyID string) {

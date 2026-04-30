@@ -143,7 +143,7 @@ func removeEntity(entities []Entity, id int16) []Entity {
 
 func isSingleOccupancyChoke(alias string) bool {
 	switch alias {
-	case "lhs_door", "rhs_door", "hallway_close_before_office", "lhs_vent", "rhs_vent":
+	case "lhs_door", "rhs_door", "lhs_closet", "rhs_closet", "player_two_office", "hallway_close_before_office", "lhs_vent", "rhs_vent":
 		return true
 	default:
 		return false
@@ -495,6 +495,42 @@ func (gs *GameState) FirstEntityNameInRoom(alias string) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+// MoveEntitiesBackFromRoom moves every entity currently in `alias` one step back
+// along its tracked path. Used for mask/office deflection behavior.
+func (gs *GameState) MoveEntitiesBackFromRoom(alias string) {
+	if gs == nil || gs.Tracker == nil || alias == "" {
+		return
+	}
+	ids := make([]int16, 0, len(gs.Tracker.EntityPositions))
+	for id, node := range gs.Tracker.EntityPositions {
+		if node != nil && node.AliasName == alias {
+			ids = append(ids, id)
+		}
+	}
+	for _, id := range ids {
+		path := gs.Tracker.EntityPaths[id]
+		if len(path) <= 1 {
+			continue
+		}
+		curr := gs.Tracker.EntityPositions[id]
+		if curr == nil {
+			continue
+		}
+		var ent Entity
+		found := false
+		for _, e := range curr.Entities {
+			if e.Id == id {
+				ent = e
+				found = true
+				break
+			}
+		}
+		if found {
+			gs.Tracker.MoveBack(ent)
+		}
+	}
 }
 
 func main1() {

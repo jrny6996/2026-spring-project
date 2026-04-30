@@ -23,6 +23,7 @@ float pitch = 0.0f;
 class MainScene : public Scene {
  private:
   Texture2D texture;
+  Model mask;
   Model map;
   Model p_map;
   Model freddy;
@@ -42,7 +43,6 @@ class MainScene : public Scene {
   bool debug_tronic_coords_ = false;
   bool left_door_closed_ = false;
   bool right_door_closed_ = false;
-  bool p2_mask_down_ = false;
   float left_door_y_ = 6.5f;
   float right_door_y_ = 6.5f;
 
@@ -93,6 +93,9 @@ class MainScene : public Scene {
     DrawModel(door, {-4.0f, left_door_y_, -2.5f}, 1.0f, WHITE);
     DrawModel(door, {0.0f, right_door_y_, -2.5f}, 1.0f, WHITE);
   }
+  void draw_mask() {
+    DrawModel(mask,{1.0f, 52.0f, 1.0f}, 1.0f, WHITE);
+  }
 
  public:
   MainScene(Camera& cam) : Scene(cam), camera(cam) {
@@ -109,7 +112,7 @@ class MainScene : public Scene {
     static constexpr const char* kPbrVsPath = "assets/shaders/glsl100/pbr.vs";
     static constexpr const char* kPbrFsPath = "assets/shaders/glsl100/pbr.fs";
     static constexpr const char* kDoorPath = "assets/door.glb";
-
+    static constexpr const char* kMaskPath = "assets/mask.glb";
     SceneAssetPreloader preloader;
     preloader.PreloadAll(
         {kFreddyPath, kBonniePath, kChicaPath, kFoxyPath, kMap1Path, kMap2Path},
@@ -123,6 +126,7 @@ class MainScene : public Scene {
     this->map = LoadModel(kMap1Path);
     this->p_map = LoadModel(kMap2Path);
     this->door = LoadModel(kDoorPath);
+    this->mask = LoadModel(kMaskPath);
     for (int i = 0; i < this->map.materialCount; i++) {
       if (this->map.materials[i].maps[MATERIAL_MAP_DIFFUSE].texture.id == 0) {
         printf("Missing texture on material %d\n", i);
@@ -180,7 +184,7 @@ class MainScene : public Scene {
               EMSCRIPTEN_WEBSOCKET_T& socket) override {
     (void)curr_scene;
     mainscene::process_check_camera_restore(state, camera_nav_);
-    const bool p2_cam_blocked = !state.is_player_one && p2_mask_down_;
+    const bool p2_cam_blocked = !state.is_player_one && state.p2_mask_down;
     if (!p2_cam_blocked) {
       mainscene::process_camera_panel_toggle(camera_nav_, state.is_player_one);
       mainscene::try_send_check_camera_room(state, camera_nav_, socket);
@@ -193,9 +197,9 @@ class MainScene : public Scene {
     if (state.gameStarted && IsKeyPressed(KEY_T))
       ws::send_step(socket);
     if (state.gameStarted && !state.is_player_one && IsKeyPressed(KEY_Q)) {
-      p2_mask_down_ = !p2_mask_down_;
-      ws::send_mask_state(socket, p2_mask_down_);
-      if (p2_mask_down_) {
+      state.p2_mask_down = !state.p2_mask_down;
+      ws::send_mask_state(socket, state.p2_mask_down);
+      if (state.p2_mask_down) {
         camera_nav_.panel_open = false;
         camera_nav_.active_feed = -1;
       }
@@ -239,7 +243,11 @@ class MainScene : public Scene {
                                   animatronic_models_.size(),
                                   this->freddyInitialPos, this->tronic_maps_,
                                   this->map, this->p_map, debug_tronic_coords_);
-  if(state.is_player_one)      this->draw_doors();
+    if (state.is_player_one) {
+      this->draw_doors();
+    } else if (state.p2_mask_down) {
+      this->draw_mask();
+    }
     EndMode3D();
     mainscene::draw_main_scene_2d(this->camera, camera_nav_, state,
                                   debug_tronic_coords_, this->tronic_maps_,

@@ -10,6 +10,9 @@
 #include "GameState.hpp"
 #include "ws_init.hpp"
 
+// #include <jet/live.hpp>
+//   jet::Live live;
+
 // Globals
 // int screenWidth = GetMonitorWidth(0);
 // int screenHeight =GetMonitorHeight(0);
@@ -27,6 +30,7 @@ void MainLoop(void) {
 
   curr_scene->listen();
   curr_scene->update(curr_scene, game_state, socket);
+  // live.update();
 }
 
 int main(void) {

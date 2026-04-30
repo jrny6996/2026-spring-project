@@ -82,8 +82,9 @@ inline void apply_free_cam_move(Vector3& camPos, float yaw, bool is_freeroam) {
 
 inline void on_freeroam_shortcut(Vector3& camPos, float yaw, float& pitch,
                                  bool& is_freeroam) {
+  // Keep CTRL+F as the free-roam shortcut so Q can be reserved for P2 mask.
   if ((IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL)) &&
-      IsKeyPressed(KEY_Q)) {
+      IsKeyPressed(KEY_F)) {
     if (is_freeroam) {
       camPos.x += sinf(yaw) * 2.0f;
       camPos.z += cosf(yaw) * 2.0f;

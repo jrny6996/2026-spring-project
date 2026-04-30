@@ -29,6 +29,14 @@ endif()
 
 # Our Project
 
+# add_subdirectory(vendor/jet-live)
+
+# include(vendor/jet-live/cmake/jet_live_setup.cmake)
+
+# set(JET_LIVE_SHARED ON)
+
+# target_link_libraries(${PROJECT_NAME}  PRIVATE jet-live)
+
 add_executable(${PROJECT_NAME} main.cpp)
 #set(raylib_VERBOSE 1)
 target_link_libraries(${PROJECT_NAME} raylib)

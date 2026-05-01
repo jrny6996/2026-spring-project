@@ -39,6 +39,9 @@ type EntityTracker struct {
 	EntityPositions map[int16]*GameGraphNode
 	EntityPaths     map[int16][]*GameGraphNode
 	ChokeCooldowns  map[string]int
+	// Set when ResetToStart runs because an animatronic hit a blocked P1 door; consumed into room wire.
+	DoorPoundLHS bool
+	DoorPoundRHS bool
 }
 
 func NewEntityTracker() *EntityTracker {
@@ -65,6 +68,15 @@ func (et *EntityTracker) AddEntity(e Entity, node *GameGraphNode) {
 	node.Entities = append(node.Entities, e)
 }
 
+func (et *EntityTracker) noteDoorPoundForBlockedDoor(alias string) {
+	switch alias {
+	case "lhs_door":
+		et.DoorPoundLHS = true
+	case "rhs_door":
+		et.DoorPoundRHS = true
+	}
+}
+
 func (et *EntityTracker) MoveEntity(e Entity) {
 	curr := et.EntityPositions[e.Id]
 	if curr == nil || len(curr.NextNodes) == 0 {
@@ -78,6 +90,7 @@ func (et *EntityTracker) MoveEntity(e Entity) {
 			et.ChokeCooldowns[curr.AliasName] = 1
 		}
 		// Closed office door means a full retreat, not a one-node shuffle.
+		et.noteDoorPoundForBlockedDoor(curr.AliasName)
 		et.ResetToStart(e)
 		return
 	}
@@ -90,6 +103,9 @@ func (et *EntityTracker) MoveEntity(e Entity) {
 	}
 
 	if next.IsBlocked {
+		if next.AliasName == "lhs_door" || next.AliasName == "rhs_door" {
+			et.noteDoorPoundForBlockedDoor(next.AliasName)
+		}
 		et.ResetToStart(e)
 		return
 	}
@@ -329,6 +345,18 @@ func NewGameState() *GameState {
 		RHSDoor:  FindNodeByAlias(p1, "rhs_door"),
 		P2Office: p2_office,
 	}
+}
+
+// ConsumeDoorPoundFlags clears tracker booleans after copying them for wire (one tick).
+func (gs *GameState) ConsumeDoorPoundFlags() (lhs, rhs bool) {
+	if gs == nil || gs.Tracker == nil {
+		return false, false
+	}
+	lhs = gs.Tracker.DoorPoundLHS
+	rhs = gs.Tracker.DoorPoundRHS
+	gs.Tracker.DoorPoundLHS = false
+	gs.Tracker.DoorPoundRHS = false
+	return lhs, rhs
 }
 
 func (gs *GameState) Step(lobbyID string) {

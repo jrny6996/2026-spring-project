@@ -37,6 +37,7 @@ int main(void) {
   ctx.state = &game_state;
 
   InitWindow(screenWidth, screenHeight, "raylib [core] example - world screen");
+  InitAudioDevice();
 
   camera.position = (Vector3){10.0f, 10.0f, 10.0f};
   camera.target = (Vector3){0.0f, 0.0f, 0.0f};

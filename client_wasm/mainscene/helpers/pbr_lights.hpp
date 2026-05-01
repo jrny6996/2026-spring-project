@@ -1,8 +1,8 @@
 #pragma once
+#include <cmath>
 #include "../../camera_nav.hpp"
 #include "../../pbr_light_ids.hpp"
 #include "raylib.h"
-#include <cmath>
 
 namespace mainscene {
 
@@ -71,8 +71,7 @@ inline void init_pbr_light(Shader& map_shader, PbrLightGPU* lights, int& count,
   L.spot_outer_cos = 0.0f;
   L.enabledLoc =
       GetShaderLocation(map_shader, TextFormat("lights[%i].enabled", idx));
-  L.typeLoc =
-      GetShaderLocation(map_shader, TextFormat("lights[%i].type", idx));
+  L.typeLoc = GetShaderLocation(map_shader, TextFormat("lights[%i].type", idx));
   L.positionLoc =
       GetShaderLocation(map_shader, TextFormat("lights[%i].position", idx));
   L.targetLoc =
@@ -81,10 +80,10 @@ inline void init_pbr_light(Shader& map_shader, PbrLightGPU* lights, int& count,
       GetShaderLocation(map_shader, TextFormat("lights[%i].color", idx));
   L.intensityLoc =
       GetShaderLocation(map_shader, TextFormat("lights[%i].intensity", idx));
-  L.spotInnerCosLoc = GetShaderLocation(
-      map_shader, TextFormat("lights[%i].spotInnerCos", idx));
-  L.spotOuterCosLoc = GetShaderLocation(
-      map_shader, TextFormat("lights[%i].spotOuterCos", idx));
+  L.spotInnerCosLoc =
+      GetShaderLocation(map_shader, TextFormat("lights[%i].spotInnerCos", idx));
+  L.spotOuterCosLoc =
+      GetShaderLocation(map_shader, TextFormat("lights[%i].spotOuterCos", idx));
   detail::push_pbr_light(map_shader, L);
 }
 
@@ -111,8 +110,7 @@ inline void init_pbr_spot_light(Shader& map_shader, PbrLightGPU* lights,
   L.spot_outer_cos = cosf(outer_half_angle_deg * DEG2RAD);
   L.enabledLoc =
       GetShaderLocation(map_shader, TextFormat("lights[%i].enabled", idx));
-  L.typeLoc =
-      GetShaderLocation(map_shader, TextFormat("lights[%i].type", idx));
+  L.typeLoc = GetShaderLocation(map_shader, TextFormat("lights[%i].type", idx));
   L.positionLoc =
       GetShaderLocation(map_shader, TextFormat("lights[%i].position", idx));
   L.targetLoc =
@@ -121,10 +119,10 @@ inline void init_pbr_spot_light(Shader& map_shader, PbrLightGPU* lights,
       GetShaderLocation(map_shader, TextFormat("lights[%i].color", idx));
   L.intensityLoc =
       GetShaderLocation(map_shader, TextFormat("lights[%i].intensity", idx));
-  L.spotInnerCosLoc = GetShaderLocation(
-      map_shader, TextFormat("lights[%i].spotInnerCos", idx));
-  L.spotOuterCosLoc = GetShaderLocation(
-      map_shader, TextFormat("lights[%i].spotOuterCos", idx));
+  L.spotInnerCosLoc =
+      GetShaderLocation(map_shader, TextFormat("lights[%i].spotInnerCos", idx));
+  L.spotOuterCosLoc =
+      GetShaderLocation(map_shader, TextFormat("lights[%i].spotOuterCos", idx));
   detail::push_pbr_light(map_shader, L);
 }
 
@@ -177,7 +175,7 @@ inline void setup_pbr_shader_locs(Shader& map_shader) {
 inline void setup_pbr_shader_uniform_defaults(Shader& map_shader) {
   // numOfLights is set in sync_pbr_shader_frame() to match pbr light count.
   Vector3 ambient_rgb = {0.0f, 0.0f, 0.0f};
-  float ambient_strength = 0.5f;
+  float ambient_strength = -0.5f;
   SetShaderValue(map_shader, GetShaderLocation(map_shader, "ambientColor"),
                  &ambient_rgb, SHADER_UNIFORM_VEC3);
   SetShaderValue(map_shader, GetShaderLocation(map_shader, "ambient"),
@@ -243,17 +241,17 @@ inline bool pbr_light_enabled(const PbrLightGPU* lights, int pbr_light_count,
 inline void init_all_scene_pbr_lights(Shader& map_shader, PbrLightGPU* lights,
                                       int& count) {
   init_pbr_light(map_shader, lights, count, {0.0f, 5.0f, 0.0f},
-                   {0.0f, 5.0f, 0.0f}, SKYBLUE, kPlayerLightIntensity);
+                 {0.0f, 5.0f, 0.0f}, SKYBLUE, kPlayerLightIntensity);
   init_pbr_light(map_shader, lights, count, {1.5f, 6.0f, -3.5f},
-                   {0.0f, 0.0f, 0.0f}, ORANGE, 1.0f);
+                 {0.0f, 0.0f, 0.0f}, ORANGE, 1.0f);
   init_pbr_light(map_shader, lights, count, {-0.5f, 6.0f, -2.0f},
-                   {0.0f, 6.0f, 0.0f}, BLUE, 1.0f);
+                 {0.0f, 6.0f, 0.0f}, BLUE, 1.0f);
   init_pbr_light(map_shader, lights, count, {-2.0f, 55.5f, -4.0f},
-                   {-0.5f, 52.5f, -4.0f}, PURPLE, 1.3f);
+                 {-0.5f, 52.5f, -4.0f}, PURPLE, 1.3f);
   init_pbr_light(map_shader, lights, count, {2.0f, 55.5f, -4.0f},
-                   {-0.5f, 52.5f, -3.0f}, BLUE, 1.3f);
+                 {-0.5f, 52.5f, -3.0f}, BLUE, 1.3f);
   init_pbr_light(map_shader, lights, count, {0.0f, 53.5f, -4.0f},
-                   {0.0f, 50.5f, -4.0f}, ORANGE, 1.0f);
+                 {0.0f, 50.5f, -4.0f}, ORANGE, 1.0f);
 
   // PbrLightId::SecondFloorHallSpot — spotlight toward far hall
   init_pbr_spot_light(map_shader, lights, count, {-0.0f, 53.5f, -7.5f},
@@ -261,9 +259,9 @@ inline void init_all_scene_pbr_lights(Shader& map_shader, PbrLightGPU* lights,
 
   for (int i = 0; i < CameraMaps::kInitSpotOrderCount; i++) {
     const SecurityCamera& sc = CameraMaps::kInitSpotOrder[i];
-    init_pbr_spot_light(map_shader, lights, count, sc.light_pos, sc.light_target,
-                        WHITE, sc.spot_intensity, sc.spot_inner_deg,
-                        sc.spot_outer_deg);
+    init_pbr_spot_light(map_shader, lights, count, sc.light_pos,
+                        sc.light_target, WHITE, sc.spot_intensity,
+                        sc.spot_inner_deg, sc.spot_outer_deg);
   }
 
   // PbrLightId::FirstFloorHallKey* — A/D only; original 1F hall positions
@@ -272,12 +270,10 @@ inline void init_all_scene_pbr_lights(Shader& map_shader, PbrLightGPU* lights,
                       {-4.0f, 4.0f, -4.0f}, WHITE, 28.0f, 30.0f, 32.0f);
   init_pbr_spot_light(map_shader, lights, count, {3.8f, 7.5f, 2.0f},
                       {4.0f, 4.0f, -4.0f}, WHITE, 28.0f, 30.0f, 32.0f);
-  set_pbr_light_enabled(lights, count,
-                        static_cast<int>(PbrLightId::FirstFloorHallKeyLHS),
-                        false);
-  set_pbr_light_enabled(lights, count,
-                        static_cast<int>(PbrLightId::FirstFloorHallKeyRHS),
-                        false);
+  set_pbr_light_enabled(
+      lights, count, static_cast<int>(PbrLightId::FirstFloorHallKeyLHS), false);
+  set_pbr_light_enabled(
+      lights, count, static_cast<int>(PbrLightId::FirstFloorHallKeyRHS), false);
 }
 
 }  // namespace mainscene

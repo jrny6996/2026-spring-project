@@ -49,11 +49,14 @@ class MainScene : public Scene {
   bool right_door_closed_ = false;
   float left_door_y_ = 6.5f;
   float right_door_y_ = 6.5f;
-  bool charge_sent_p1_ = false;
-  bool charge_sent_p2_power_ = false;
-  bool charge_sent_p2_music_ = false;
   /// P2 full-screen generator/music UI (E); off by default so the office is visible.
   bool p2_task_overlay_open_ = false;
+
+  Music ambience_music_{};
+  Sound door_pound_sound_{};
+  bool ambience_playing_ = false;
+  bool prev_door_pound_lhs_ = false;
+  bool prev_door_pound_rhs_ = false;
 
   static constexpr float kDoorYDown = 2.5f;
   static constexpr float kDoorYUp = 6.5f;
@@ -141,10 +144,14 @@ class MainScene : public Scene {
     static constexpr const char* kPbrFsPath = "assets/shaders/glsl100/pbr.fs";
     static constexpr const char* kDoorPath = "assets/door.glb";
     static constexpr const char* kMaskPath = "assets/mask.glb";
+    static constexpr const char* kAmbienceMp3Path = "assets/sound/Ambience 2.mp3";
+    static constexpr const char* kDoorPoundMp3Path =
+        "assets/sound/Door Pounding Me.mp3";
     SceneAssetPreloader preloader;
     preloader.PreloadAll(
         {kFreddyPath, kBonniePath, kChicaPath, kFoxyPath, kToyFreddyPath,
-         kToyBonniePath, kToyChicaPath, kToyFoxyPath, kMap1Path, kMap2Path},
+         kToyBonniePath, kToyChicaPath, kToyFoxyPath, kMap1Path, kMap2Path,
+         kAmbienceMp3Path, kDoorPoundMp3Path},
         {kPbrVsPath, kPbrFsPath});
     preloader.BeginServe();
 
@@ -196,6 +203,29 @@ class MainScene : public Scene {
     this->camera.fovy = 50.0f;
     this->camera.target.x = -1.0f;
     this->camera.target.z = 10.0f;
+
+    if (IsAudioDeviceReady()) {
+      ambience_music_ = LoadMusicStream(kAmbienceMp3Path);
+      if (IsMusicValid(ambience_music_)) {
+        ambience_music_.looping = true;
+        SetMusicVolume(ambience_music_, 0.45f);
+      }
+      door_pound_sound_ = LoadSound(kDoorPoundMp3Path);
+      if (IsSoundValid(door_pound_sound_)) {
+        SetSoundVolume(door_pound_sound_, 0.85f);
+      }
+    }
+  }
+
+  ~MainScene() {
+    if (IsMusicValid(ambience_music_)) {
+      UnloadMusicStream(ambience_music_);
+      ambience_music_ = Music{};
+    }
+    if (IsSoundValid(door_pound_sound_)) {
+      UnloadSound(door_pound_sound_);
+      door_pound_sound_ = Sound{};
+    }
   }
 
   bool set_pbr_light_enabled(int index, bool enabled) {
@@ -220,6 +250,29 @@ class MainScene : public Scene {
   void update(Scene*& curr_scene, GameState& state,
               EMSCRIPTEN_WEBSOCKET_T& socket) override {
     (void)curr_scene;
+    if (IsAudioDeviceReady() && IsMusicValid(ambience_music_)) {
+      UpdateMusicStream(ambience_music_);
+    }
+    if (state.gameStarted) {
+      if (IsMusicValid(ambience_music_) && !ambience_playing_) {
+        PlayMusicStream(ambience_music_);
+        ambience_playing_ = true;
+      }
+      if (state.is_player_one &&
+          ((state.door_pound_lhs && !prev_door_pound_lhs_) ||
+           (state.door_pound_rhs && !prev_door_pound_rhs_))) {
+        if (IsSoundValid(door_pound_sound_))
+          PlaySound(door_pound_sound_);
+      }
+    } else {
+      if (ambience_playing_ && IsMusicValid(ambience_music_)) {
+        StopMusicStream(ambience_music_);
+        ambience_playing_ = false;
+      }
+    }
+    prev_door_pound_lhs_ = state.door_pound_lhs;
+    prev_door_pound_rhs_ = state.door_pound_rhs;
+
     mainscene::process_check_camera_restore(state, camera_nav_);
     const bool p2_cam_blocked = !state.is_player_one && state.p2_mask_down;
     if (!p2_cam_blocked) {
@@ -229,7 +282,8 @@ class MainScene : public Scene {
       camera_nav_.panel_open = false;
       camera_nav_.active_feed = -1;
     }
-    if (IsKeyPressed(KEY_L))
+    // F3 (not L — P2 uses L for music box)
+    if (IsKeyPressed(KEY_F3))
       debug_tronic_coords_ = !debug_tronic_coords_;
     if (state.gameStarted && IsKeyPressed(KEY_T))
       ws::send_step(socket);
@@ -243,62 +297,21 @@ class MainScene : public Scene {
         p2_task_overlay_open_ = false;
         camera_nav_.panel_open = false;
         camera_nav_.active_feed = -1;
-        if (charge_sent_p2_power_) {
-          ws::send_charge_hold(socket, "p2power", false);
-          charge_sent_p2_power_ = false;
-        }
-        if (charge_sent_p2_music_) {
-          ws::send_charge_hold(socket, "p2music", false);
-          charge_sent_p2_music_ = false;
-        }
       }
     }
 
     if (state.gameStarted) {
-      if (state.is_player_one) {
-        const bool want_charge =
-            IsKeyDown(KEY_SPACE) && (!state.p2_in_lobby || state.p2_lost);
-        if (want_charge != charge_sent_p1_) {
-          ws::send_charge_hold(socket, "p1", want_charge);
-          charge_sent_p1_ = want_charge;
-        }
-      } else {
-        if (state.p2_mask_down) {
-          if (charge_sent_p2_power_) {
-            ws::send_charge_hold(socket, "p2power", false);
-            charge_sent_p2_power_ = false;
-          }
-          if (charge_sent_p2_music_) {
-            ws::send_charge_hold(socket, "p2music", false);
-            charge_sent_p2_music_ = false;
-          }
-        } else {
-          const bool p2p = IsKeyDown(KEY_J);
-          const bool p2m = IsKeyDown(KEY_L);
-          if (p2p != charge_sent_p2_power_) {
-            ws::send_charge_hold(socket, "p2power", p2p);
-            charge_sent_p2_power_ = p2p;
-          }
-          if (p2m != charge_sent_p2_music_) {
-            ws::send_charge_hold(socket, "p2music", p2m);
-            charge_sent_p2_music_ = p2m;
-          }
-        }
+      if (state.is_player_one && IsKeyPressed(KEY_SPACE)) {
+        ws::send_p1_power_queued(socket, 1);
+      }
+      if (!state.is_player_one && !state.p2_mask_down) {
+        if (IsKeyPressed(KEY_J))
+          ws::send_p2_power_queued(socket, 1);
+        if (IsKeyPressed(KEY_L))
+          ws::send_p2_music_queued(socket, 1);
       }
     } else {
       p2_task_overlay_open_ = false;
-      if (charge_sent_p1_) {
-        ws::send_charge_hold(socket, "p1", false);
-        charge_sent_p1_ = false;
-      }
-      if (charge_sent_p2_power_) {
-        ws::send_charge_hold(socket, "p2power", false);
-        charge_sent_p2_power_ = false;
-      }
-      if (charge_sent_p2_music_) {
-        ws::send_charge_hold(socket, "p2music", false);
-        charge_sent_p2_music_ = false;
-      }
     }
     if (state.gameStarted && state.is_player_one) {
       const bool prev_left = left_door_closed_;

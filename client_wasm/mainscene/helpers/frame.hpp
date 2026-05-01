@@ -587,7 +587,7 @@ inline void draw_tronic_coords_debug_hud(
   }
 }
 
-/// Full-screen office HUD for P2 (toggle with E). Left = power (hold J), right = music (L).
+/// Full-screen office HUD for P2 (toggle with E). Tap J/L to queue; T applies tick.
 inline void draw_p2_task_overlay(const GameState& state, bool show_overlay) {
   if (!show_overlay || state.is_player_one || !state.gameStarted ||
       state.p2_mask_down)
@@ -603,7 +603,7 @@ inline void draw_p2_task_overlay(const GameState& state, bool show_overlay) {
   const char* left_title = "GENERATE POWER";
   int tw = MeasureText(left_title, title_fs);
   DrawText(left_title, mid / 2 - tw / 2, sh / 5, title_fs, RAYWHITE);
-  const char* j_hint = "hold J";
+  const char* j_hint = "tap J (+ T tick)";
   DrawText(j_hint, mid / 2 - MeasureText(j_hint, 18) / 2, sh / 5 + 30, 18,
            Fade(LIGHTGRAY, 0.92f));
 
@@ -611,7 +611,7 @@ inline void draw_p2_task_overlay(const GameState& state, bool show_overlay) {
   tw = MeasureText(right_title, title_fs);
   DrawText(right_title, mid + (sw - mid) / 2 - tw / 2, sh / 5, title_fs,
            RAYWHITE);
-  const char* l_hint = "hold L";
+  const char* l_hint = "tap L (+ T tick)";
   DrawText(l_hint,
            mid + (sw - mid) / 2 - MeasureText(l_hint, 18) / 2, sh / 5 + 30, 18,
            Fade(LIGHTGRAY, 0.92f));
@@ -679,8 +679,8 @@ inline void draw_main_scene_2d(
     std::snprintf(pbuf, sizeof(pbuf), "Power: %d / 100", state.power);
     const int sw = GetScreenWidth();
     DrawText(pbuf, sw - 200, 10, 18, GOLD);
-    if (state.is_player_one && (!state.p2_in_lobby || state.p2_lost)) {
-      DrawText("SPACE: add power (half P2 rate)", sw - 320, 32, 14,
+    if (state.is_player_one) {
+      DrawText("SPACE: queue power (applied on T tick)", sw - 360, 32, 14,
                Fade(SKYBLUE, 0.9f));
     }
   }
@@ -689,7 +689,7 @@ inline void draw_main_scene_2d(
     Color mask_color = state.p2_mask_down ? GREEN : ORANGE;
     DrawText(mask_label, 10, 82, 16, mask_color);
     if (state.gameStarted && !state.p2_mask_down) {
-      DrawText("E: task panel (power / music)  |  hold J / L", 10, 100, 14,
+      DrawText("E: tasks  |  tap J/L to queue  |  T = apply tick", 10, 100, 14,
                Fade(SKYBLUE, 0.88f));
     }
   }

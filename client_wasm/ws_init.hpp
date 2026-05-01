@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdio>
 #include <string>
 
 #include <emscripten/emscripten.h>
@@ -71,13 +72,37 @@ inline void send_mask_state(EMSCRIPTEN_WEBSOCKET_T socket, bool down) {
   send_json_message(socket, "action", content);
 }
 
-/// Hold state for generator/music (no broadcast). Applied on server game step (T).
-/// roles: "p1" | "p2power" | "p2music"
-inline void send_charge_hold(EMSCRIPTEN_WEBSOCKET_T socket, const char* role,
-                              bool held) {
-  const std::string content =
-      std::string("charge:") + role + ":" + (held ? "1" : "0");
-  send_json_message(socket, "action", content);
+/// P1: each press queues power units; server adds them on the next game step (T).
+/// units clamped client-side; server caps backlog.
+inline void send_p1_power_queued(EMSCRIPTEN_WEBSOCKET_T socket, int units) {
+  if (units < 1)
+    units = 1;
+  if (units > 32)
+    units = 32;
+  char buf[24];
+  std::snprintf(buf, sizeof(buf), "p1q:%d", units);
+  send_json_message(socket, "action", std::string(buf));
+}
+
+/// P2: each tap queues units; drained on server game step (T). Same contract as P1 p1q.
+inline void send_p2_power_queued(EMSCRIPTEN_WEBSOCKET_T socket, int units) {
+  if (units < 1)
+    units = 1;
+  if (units > 32)
+    units = 32;
+  char buf[24];
+  std::snprintf(buf, sizeof(buf), "p2qp:%d", units);
+  send_json_message(socket, "action", std::string(buf));
+}
+
+inline void send_p2_music_queued(EMSCRIPTEN_WEBSOCKET_T socket, int units) {
+  if (units < 1)
+    units = 1;
+  if (units > 32)
+    units = 32;
+  char buf[24];
+  std::snprintf(buf, sizeof(buf), "p2qm:%d", units);
+  send_json_message(socket, "action", std::string(buf));
 }
 
 inline bool try_parse_json(const char* data, size_t len, json& out) {
@@ -220,10 +245,12 @@ inline EM_BOOL on_message(int, const EmscriptenWebSocketMessageEvent* e,
             state->power = data.value("power", 30);
           if (data.contains("musicBoxWind"))
             state->music_box_wind = data.value("musicBoxWind", 0);
-          if (data.contains("p2InLobby"))
-            state->p2_in_lobby = data.value("p2InLobby", false);
-          if (data.contains("p2Lost"))
-            state->p2_lost = data.value("p2Lost", false);
+          // Always refresh from wire (default false if key omitted) so stale flags
+          // never block P1 after lobby/game changes.
+          state->p2_in_lobby = data.value("p2InLobby", false);
+          state->p2_lost = data.value("p2Lost", false);
+          state->door_pound_lhs = data.value("doorPoundLhs", false);
+          state->door_pound_rhs = data.value("doorPoundRhs", false);
           if (state->gameStarted && data.contains("simEntities") &&
               data["simEntities"].is_array()) {
             state->sim_entities.clear();

@@ -37,6 +37,14 @@ class GameState {
   bool is_player_one = false;
   bool p2_mask_down = false;
 
+  /// Shared night resources (from server `state`).
+  int power = 30;
+  int music_box_wind = 0;
+  /// Second player joined this lobby (still connected slot).
+  bool p2_in_lobby = false;
+  /// P2 eliminated; P1 may use SPACE to charge at half rate.
+  bool p2_lost = false;
+
   /// Security-camera check: server round-trip in progress; feed is suspended.
   bool check_camera_in_flight = false;
   bool check_camera_restore_feed = false;

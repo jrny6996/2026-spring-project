@@ -1,16 +1,16 @@
 #pragma once
-#include "camera_control.hpp"
-#include "pbr_lights.hpp"
-#include "../../GameState.hpp"
-#include "../../camera_nav.hpp"
-#include "../../ws_init.hpp"
-#include "rooms/create_tronic_positions.hpp"
-#include "raylib.h"
 #include <emscripten/websocket.h>
 #include <cstddef>
 #include <cstdio>
 #include <map>
 #include <string>
+#include "../../GameState.hpp"
+#include "../../camera_nav.hpp"
+#include "../../ws_init.hpp"
+#include "camera_control.hpp"
+#include "pbr_lights.hpp"
+#include "raylib.h"
+#include "rooms/create_tronic_positions.hpp"
 namespace mainscene {
 
 inline void process_check_camera_restore(GameState& state,
@@ -48,9 +48,10 @@ inline void try_send_check_camera_room(GameState& state,
   }
 }
 
-inline void clamp_and_apply_pbr_for_security_feed(
-    GameState& state, CameraNavState& camera_nav, PbrLightGPU* lights,
-    int pbr_light_count) {
+inline void clamp_and_apply_pbr_for_security_feed(GameState& state,
+                                                  CameraNavState& camera_nav,
+                                                  PbrLightGPU* lights,
+                                                  int pbr_light_count) {
   if (camera_nav.active_feed >= 0) {
     int n = 0;
     const SecurityCamera* map =
@@ -60,15 +61,16 @@ inline void clamp_and_apply_pbr_for_security_feed(
     const PbrLightId active_light = map[camera_nav.active_feed].spot_light;
     for (int i = 0; i < CameraMaps::kInitSpotOrderCount; i++) {
       const SecurityCamera& sc = CameraMaps::kInitSpotOrder[i];
-      set_pbr_light_enabled(lights, pbr_light_count, static_cast<int>(sc.spot_light),
+      set_pbr_light_enabled(lights, pbr_light_count,
+                            static_cast<int>(sc.spot_light),
                             sc.spot_light == active_light);
     }
-    set_pbr_light_enabled(
-        lights, pbr_light_count,
-        static_cast<int>(PbrLightId::FirstFloorHallKeyLHS), false);
-    set_pbr_light_enabled(
-        lights, pbr_light_count,
-        static_cast<int>(PbrLightId::FirstFloorHallKeyRHS), false);
+    set_pbr_light_enabled(lights, pbr_light_count,
+                          static_cast<int>(PbrLightId::FirstFloorHallKeyLHS),
+                          false);
+    set_pbr_light_enabled(lights, pbr_light_count,
+                          static_cast<int>(PbrLightId::FirstFloorHallKeyRHS),
+                          false);
   } else {
     if (state.is_player_one) {
       for (int i = 0; i < CameraMaps::kInitSpotOrderCount; i++) {
@@ -76,28 +78,28 @@ inline void clamp_and_apply_pbr_for_security_feed(
         set_pbr_light_enabled(lights, pbr_light_count,
                               static_cast<int>(sc.spot_light), false);
       }
-      set_pbr_light_enabled(
-          lights, pbr_light_count,
-          static_cast<int>(PbrLightId::FirstFloorHallKeyLHS), IsKeyDown(KEY_A));
-      set_pbr_light_enabled(
-          lights, pbr_light_count,
-          static_cast<int>(PbrLightId::FirstFloorHallKeyRHS), IsKeyDown(KEY_D));
+      set_pbr_light_enabled(lights, pbr_light_count,
+                            static_cast<int>(PbrLightId::FirstFloorHallKeyLHS),
+                            IsKeyDown(KEY_A));
+      set_pbr_light_enabled(lights, pbr_light_count,
+                            static_cast<int>(PbrLightId::FirstFloorHallKeyRHS),
+                            IsKeyDown(KEY_D));
     } else {
-      set_pbr_light_enabled(
-          lights, pbr_light_count,
-          static_cast<int>(PbrLightId::FirstFloorHallKeyLHS), false);
-      set_pbr_light_enabled(
-          lights, pbr_light_count,
-          static_cast<int>(PbrLightId::FirstFloorHallKeyRHS), false);
-      set_pbr_light_enabled(
-          lights, pbr_light_count,
-          static_cast<int>(PbrLightId::SecondFloorHallSpot), IsKeyDown(KEY_W));
-      set_pbr_light_enabled(
-          lights, pbr_light_count, static_cast<int>(PbrLightId::SecondFloorLHS),
-          IsKeyDown(KEY_A));
-      set_pbr_light_enabled(
-          lights, pbr_light_count, static_cast<int>(PbrLightId::SecondFloorRHS),
-          IsKeyDown(KEY_D));
+      set_pbr_light_enabled(lights, pbr_light_count,
+                            static_cast<int>(PbrLightId::FirstFloorHallKeyLHS),
+                            false);
+      set_pbr_light_enabled(lights, pbr_light_count,
+                            static_cast<int>(PbrLightId::FirstFloorHallKeyRHS),
+                            false);
+      set_pbr_light_enabled(lights, pbr_light_count,
+                            static_cast<int>(PbrLightId::SecondFloorHallSpot),
+                            IsKeyDown(KEY_W));
+      set_pbr_light_enabled(lights, pbr_light_count,
+                            static_cast<int>(PbrLightId::SecondFloorLHS),
+                            IsKeyDown(KEY_A));
+      set_pbr_light_enabled(lights, pbr_light_count,
+                            static_cast<int>(PbrLightId::SecondFloorRHS),
+                            IsKeyDown(KEY_D));
     }
   }
 }
@@ -109,15 +111,17 @@ inline void apply_player_two_default_campos(bool is_player_one,
   }
 }
 
-inline void apply_security_feed_or_office_view(
-    Camera& camera, CameraNavState& camera_nav, bool is_player_one,
-    Vector3& camPos, float& yaw, float& pitch, bool is_freeroam) {
+inline void apply_security_feed_or_office_view(Camera& camera,
+                                               CameraNavState& camera_nav,
+                                               bool is_player_one,
+                                               Vector3& camPos, float& yaw,
+                                               float& pitch, bool is_freeroam) {
   if (camera_nav.active_feed >= 0) {
     int n = 0;
     const SecurityCamera* map = CameraMaps::MapForPlayer(is_player_one, &n);
     if (camera_nav.active_feed < n)
-      CameraMaps::ApplySecurityCameraView(
-          map[camera_nav.active_feed], static_cast<Camera3D&>(camera));
+      CameraMaps::ApplySecurityCameraView(map[camera_nav.active_feed],
+                                          static_cast<Camera3D&>(camera));
   } else {
     update_office_camera(camera, camPos, yaw, pitch, is_freeroam);
   }
@@ -147,7 +151,8 @@ inline Vector3 tronic_draw_scale_for(
 }
 
 inline std::map<std::string, int> tronic_room_occupancy(
-    const std::vector<SimEntityRow>& sim_entities, const char* only_room_alias) {
+    const std::vector<SimEntityRow>& sim_entities,
+    const char* only_room_alias) {
   std::map<std::string, int> counts;
   for (const auto& ent : sim_entities) {
     if (tronic_key_from_sim_entity(ent.id, ent.name).empty())
@@ -216,9 +221,9 @@ inline std::size_t draw_tronic_sim_entities(
     const std::vector<SimEntityRow>& sim_entities,
     const std::map<std::string, TronicPositionMap>& tronic_by_entity,
     Model* const* animatronic_models, std::size_t animatronic_model_count,
-    const Vector3& default_pos,
-    const Vector3& rotation_axis, const Vector3& anim_scale,
-    const char* only_room_alias, bool use_backup_when_pos_missing) {
+    const Vector3& default_pos, const Vector3& rotation_axis,
+    const Vector3& anim_scale, const char* only_room_alias,
+    bool use_backup_when_pos_missing) {
   if (animatronic_model_count < 2)
     return 0;
   const Model& default_mesh = *animatronic_models[1];
@@ -239,9 +244,9 @@ inline std::size_t draw_tronic_sim_entities(
     Vector3 pos{};
     Vector3 ax{};
     float ang = 0.0f;
-    if (!resolve_tronic_draw_transform(ent, tronic_by_entity, default_pos,
-                                       rotation_axis, use_backup_when_pos_missing,
-                                       &pos, &ax, &ang))
+    if (!resolve_tronic_draw_transform(
+            ent, tronic_by_entity, default_pos, rotation_axis,
+            use_backup_when_pos_missing, &pos, &ax, &ang))
       continue;
 
     auto named = tronic_by_entity.find(tkey);
@@ -283,8 +288,8 @@ inline std::size_t draw_tronic_sim_entities_matching_debug_hud(
     const std::vector<SimEntityRow>& sim_entities,
     const std::map<std::string, TronicPositionMap>& tronic_by_entity,
     Model* const* animatronic_models, std::size_t animatronic_model_count,
-    const Vector3& default_pos,
-    const Vector3& rotation_axis, const Vector3& anim_scale) {
+    const Vector3& default_pos, const Vector3& rotation_axis,
+    const Vector3& anim_scale) {
   if (animatronic_model_count < 2)
     return 0;
   const Model& default_mesh = *animatronic_models[1];
@@ -300,14 +305,14 @@ inline std::size_t draw_tronic_sim_entities_matching_debug_hud(
     Vector3 pos{};
     Vector3 ax{};
     float ang = 0.0f;
-    if (!resolve_tronic_draw_transform(ent, tronic_by_entity, default_pos,
-                                       rotation_axis,
-                                       /*use_backup_when_pos_missing=*/true,
-                                       &pos, &ax, &ang))
+    if (!resolve_tronic_draw_transform(
+            ent, tronic_by_entity, default_pos, rotation_axis,
+            /*use_backup_when_pos_missing=*/true, &pos, &ax, &ang))
       continue;
     auto named = tronic_by_entity.find(tkey);
     const Model* mesh = &default_mesh;
-    Vector3 draw_scale = tronic_draw_scale_for(tronic_by_entity, tkey, anim_scale);
+    Vector3 draw_scale =
+        tronic_draw_scale_for(tronic_by_entity, tkey, anim_scale);
     Vector3 off{0.0f, 0.0f, 0.0f};
     if (named != tronic_by_entity.end()) {
       mesh = &named->second.model;
@@ -344,14 +349,16 @@ inline void draw_main_scene_3d(
     const std::map<std::string, TronicPositionMap>& tronic_by_entity,
     const Model& map, const Model& p_map, bool debug_tronic_coords) {
   const Vector3 rotationAxis = {0.0f, 1.0f, 0.0f};
-  const Vector3 anim_scale = tronic_draw_scale_for(tronic_by_entity, "freddy",
-                                                   {0.05f, 0.05f, 0.05f});
+  const Vector3 anim_scale =
+      tronic_draw_scale_for(tronic_by_entity, "freddy", {0.05f, 0.05f, 0.05f});
 
   if (animatronic_model_count < 2)
     return;
   const Model& default_mesh = *animatronic_models[1];
-  if(state.is_player_one) DrawModel(map, (Vector3){0.0f, 2.5f, -2.5f}, 1.0f, WHITE);
-  else DrawModel(p_map, (Vector3){1.0f, 50.0f, -13.0f}, 1.0f, WHITE);
+  if (state.is_player_one)
+    DrawModel(map, (Vector3){0.0f, 2.5f, -2.5f}, 1.0f, WHITE);
+  else
+    DrawModel(p_map, (Vector3){1.0f, 50.0f, -13.0f}, 1.0f, WHITE);
 
   const bool on_feed = camera_nav.active_feed >= 0;
   if (!on_feed || !state.gameStarted) {
@@ -360,14 +367,12 @@ inline void draw_main_scene_3d(
       if (debug_tronic_coords) {
         drawn = draw_tronic_sim_entities_matching_debug_hud(
             state.sim_entities, tronic_by_entity, animatronic_models,
-            animatronic_model_count,
-            default_pos, rotationAxis, anim_scale);
+            animatronic_model_count, default_pos, rotationAxis, anim_scale);
       } else {
-        drawn = draw_tronic_sim_entities(state.sim_entities, tronic_by_entity,
-                                         animatronic_models,
-                                         animatronic_model_count, default_pos,
-                                         rotationAxis, anim_scale, nullptr,
-                                         false);
+        drawn = draw_tronic_sim_entities(
+            state.sim_entities, tronic_by_entity, animatronic_models,
+            animatronic_model_count, default_pos, rotationAxis, anim_scale,
+            nullptr, false);
       }
       if (drawn == 0) {
         DrawModelEx(default_mesh, default_pos, rotationAxis, 0.0f, anim_scale,
@@ -376,15 +381,12 @@ inline void draw_main_scene_3d(
     } else {
       DrawModelEx(default_mesh, default_pos, rotationAxis, 0.0f, anim_scale,
                   WHITE);
-
-                  
     }
     return;
   }
 
   int n_cams = 0;
-  const SecurityCamera* cams =
-      CameraMaps::MapForPlayer(is_player_one, &n_cams);
+  const SecurityCamera* cams = CameraMaps::MapForPlayer(is_player_one, &n_cams);
   if (camera_nav.active_feed >= n_cams || n_cams == 0) {
     DrawModelEx(default_mesh, default_pos, rotationAxis, 0.0f, anim_scale,
                 WHITE);
@@ -402,8 +404,8 @@ inline void draw_main_scene_3d(
   if (debug_tronic_coords && !state.sim_entities.empty()) {
     if (draw_tronic_sim_entities_matching_debug_hud(
             state.sim_entities, tronic_by_entity, animatronic_models,
-            animatronic_model_count,
-            default_pos, rotationAxis, anim_scale) == 0) {
+            animatronic_model_count, default_pos, rotationAxis,
+            anim_scale) == 0) {
       DrawModelEx(default_mesh, default_pos, rotationAxis, 0.0f, anim_scale,
                   WHITE);
     }
@@ -422,9 +424,113 @@ inline void draw_main_scene_3d(
   }
 
   draw_tronic_sim_entities(state.sim_entities, tronic_by_entity,
-                            animatronic_models, animatronic_model_count,
-                            default_pos, rotationAxis,
-                            anim_scale, sim_alias, true);
+                           animatronic_models, animatronic_model_count,
+                           default_pos, rotationAxis, anim_scale, sim_alias,
+                           true);
+}
+
+/// Projects each tronic's layout position and draws its sim `room_alias` above it
+/// (free-roam office view only; hidden while a security feed is full-screen).
+inline void draw_freeroam_tronic_room_labels(
+    const Camera& camera, const CameraNavState& camera_nav,
+    const GameState& state,
+    const std::map<std::string, TronicPositionMap>& tronic_by_entity,
+    const Vector3& default_pos, bool is_freeroam, bool debug_tronic_coords) {
+  if (!is_freeroam || !state.gameStarted || state.sim_entities.empty())
+    return;
+  if (camera_nav.active_feed >= 0)
+    return;
+
+  const Vector3 rotation_axis = {0.0f, 1.0f, 0.0f};
+  const std::map<std::string, int> occupancy =
+      tronic_room_occupancy(state.sim_entities, nullptr);
+  constexpr float kLabelLiftY = 1.15f;
+  const int font_size = 16;
+  const Color label_color = {120, 220, 255, 255};
+
+  auto draw_one = [&](const SimEntityRow& ent, const Vector3& pos) {
+    Vector3 label_pos = pos;
+    label_pos.y += kLabelLiftY;
+    Vector2 sp = GetWorldToScreen(label_pos, camera);
+    const char* room_text =
+        ent.room_alias.empty() ? "-" : ent.room_alias.c_str();
+    int tw = MeasureText(room_text, font_size);
+    int x = static_cast<int>(sp.x) - tw / 2;
+    int y = static_cast<int>(sp.y);
+    DrawText(room_text, x, y, font_size, label_color);
+  };
+
+  if (debug_tronic_coords) {
+    for (const auto& ent : state.sim_entities) {
+      const std::string tkey = tronic_key_from_sim_entity(ent.id, ent.name);
+      if (tkey.empty())
+        continue;
+      if (tkey == "freddy" || tkey == "toy_freddy")
+        continue;
+      Vector3 pos{};
+      Vector3 ax{};
+      float ang = 0.0f;
+      if (!resolve_tronic_draw_transform(
+              ent, tronic_by_entity, default_pos, rotation_axis,
+              /*use_backup_when_pos_missing=*/true, &pos, &ax, &ang))
+        continue;
+      Vector3 off{0.0f, 0.0f, 0.0f};
+      auto named = tronic_by_entity.find(tkey);
+      if (named != tronic_by_entity.end()) {
+        off = named->second.character_offset;
+      } else {
+        auto fb = tronic_by_entity.find("freddy");
+        if (fb != tronic_by_entity.end())
+          off = fb->second.character_offset;
+      }
+      if (should_apply_character_offset(ent)) {
+        pos.x += off.x;
+        pos.y += off.y;
+        pos.z += off.z;
+      }
+      auto occ_it = occupancy.find(ent.room_alias);
+      if (occ_it != occupancy.end() && occ_it->second > 1) {
+        const float spread = 0.42f;
+        pos.x += static_cast<float>((ent.id % 5) - 2) * spread;
+      }
+      draw_one(ent, pos);
+    }
+  } else {
+    for (const auto& ent : state.sim_entities) {
+      const std::string tkey = tronic_key_from_sim_entity(ent.id, ent.name);
+      if (tkey.empty())
+        continue;
+      if (ent.room_alias.empty())
+        continue;
+      Vector3 pos{};
+      Vector3 ax{};
+      float ang = 0.0f;
+      if (!resolve_tronic_draw_transform(
+              ent, tronic_by_entity, default_pos, rotation_axis,
+              /*use_backup_when_pos_missing=*/false, &pos, &ax, &ang))
+        continue;
+      Vector3 off{0.0f, 0.0f, 0.0f};
+      auto named = tronic_by_entity.find(tkey);
+      if (named != tronic_by_entity.end()) {
+        off = named->second.character_offset;
+      } else {
+        auto fb = tronic_by_entity.find("freddy");
+        if (fb != tronic_by_entity.end())
+          off = fb->second.character_offset;
+      }
+      if (should_apply_character_offset(ent)) {
+        pos.x += off.x;
+        pos.y += off.y;
+        pos.z += off.z;
+      }
+      auto occ_it = occupancy.find(ent.room_alias);
+      if (occ_it != occupancy.end() && occ_it->second > 1) {
+        const float spread = 0.42f;
+        pos.x += static_cast<float>((ent.id % 5) - 2) * spread;
+      }
+      draw_one(ent, pos);
+    }
+  }
 }
 
 inline void draw_tronic_coords_debug_hud(
@@ -447,10 +553,9 @@ inline void draw_tronic_coords_debug_hud(
     Vector3 pos{};
     Vector3 ax{};
     float ang = 0.0f;
-    if (!resolve_tronic_draw_transform(ent, tronic_by_entity, default_pos,
-                                       default_axis,
-                                       /*use_backup_when_pos_missing=*/true,
-                                       &pos, &ax, &ang))
+    if (!resolve_tronic_draw_transform(
+            ent, tronic_by_entity, default_pos, default_axis,
+            /*use_backup_when_pos_missing=*/true, &pos, &ax, &ang))
       continue;
     Vector3 off{0.0f, 0.0f, 0.0f};
     auto named = tronic_by_entity.find(tkey);
@@ -471,10 +576,10 @@ inline void draw_tronic_coords_debug_hud(
       const float spread = 0.42f;
       pos.x += static_cast<float>((ent.id % 5) - 2) * spread;
     }
-    std::snprintf(line, sizeof(line),
-                  "%s  [%s]  x=%.2f y=%.2f z=%.2f", ent.name.c_str(),
-                  ent.room_alias.c_str(), static_cast<double>(pos.x),
-                  static_cast<double>(pos.y), static_cast<double>(pos.z));
+    std::snprintf(line, sizeof(line), "%s  [%s]  x=%.2f y=%.2f z=%.2f",
+                  ent.name.c_str(), ent.room_alias.c_str(),
+                  static_cast<double>(pos.x), static_cast<double>(pos.y),
+                  static_cast<double>(pos.z));
     DrawText(line, 10, y, 14, RAYWHITE);
     y += 16;
     if (y > GetScreenHeight() - 80)
@@ -482,12 +587,78 @@ inline void draw_tronic_coords_debug_hud(
   }
 }
 
-inline void draw_main_scene_2d(Camera& camera, CameraNavState& camera_nav,
-                               const GameState& state,
-                               bool show_tronic_coords_debug,
-                               const std::map<std::string, TronicPositionMap>&
-                                   tronic_by_entity,
-                               const Vector3& tronic_default_pos) {
+/// Full-screen office HUD for P2 (toggle with E). Left = power (hold J), right = music (L).
+inline void draw_p2_task_overlay(const GameState& state, bool show_overlay) {
+  if (!show_overlay || state.is_player_one || !state.gameStarted ||
+      state.p2_mask_down)
+    return;
+  const int sw = GetScreenWidth();
+  const int sh = GetScreenHeight();
+  const int mid = sw / 2;
+  DrawRectangle(0, 0, sw, sh, Fade(BLACK, 0.78f));
+  DrawRectangle(0, 0, mid, sh, Fade((Color){35, 60, 110, 100}, 1.0f));
+  DrawRectangle(mid, 0, sw - mid, sh, Fade((Color){75, 35, 85, 100}, 1.0f));
+
+  const int title_fs = 22;
+  const char* left_title = "GENERATE POWER";
+  int tw = MeasureText(left_title, title_fs);
+  DrawText(left_title, mid / 2 - tw / 2, sh / 5, title_fs, RAYWHITE);
+  const char* j_hint = "hold J";
+  DrawText(j_hint, mid / 2 - MeasureText(j_hint, 18) / 2, sh / 5 + 30, 18,
+           Fade(LIGHTGRAY, 0.92f));
+
+  const char* right_title = "WIND MUSIC BOX";
+  tw = MeasureText(right_title, title_fs);
+  DrawText(right_title, mid + (sw - mid) / 2 - tw / 2, sh / 5, title_fs,
+           RAYWHITE);
+  const char* l_hint = "hold L";
+  DrawText(l_hint,
+           mid + (sw - mid) / 2 - MeasureText(l_hint, 18) / 2, sh / 5 + 30, 18,
+           Fade(LIGHTGRAY, 0.92f));
+
+  auto bar = [](int x, int y, int w, int h, float t, Color fill) {
+    DrawRectangle(x, y, w, h, (Color){30, 30, 30, 220});
+    const int fw = static_cast<int>(static_cast<float>(w) * t);
+    if (fw > 0)
+      DrawRectangle(x, y, fw, h, fill);
+    DrawRectangleLines(x, y, w, h, Fade(RAYWHITE, 0.35f));
+  };
+
+  const int bw = mid - 72;
+  const int bh = 18;
+  const int by = sh - 110;
+  float pw =
+      static_cast<float>(state.power) / 100.0f;
+  if (pw < 0.0f)
+    pw = 0.0f;
+  if (pw > 1.0f)
+    pw = 1.0f;
+  float mw =
+      static_cast<float>(state.music_box_wind) / 100.0f;
+  if (mw < 0.0f)
+    mw = 0.0f;
+  if (mw > 1.0f)
+    mw = 1.0f;
+
+  char line[48];
+  std::snprintf(line, sizeof(line), "Power %d / 100", state.power);
+  DrawText(line, 36, by - 26, 18, WHITE);
+  bar(36, by, bw, bh, pw, (Color){60, 200, 120, 255});
+
+  std::snprintf(line, sizeof(line), "Music box %d / 100", state.music_box_wind);
+  DrawText(line, mid + 36, by - 26, 18, WHITE);
+  bar(mid + 36, by, bw, bh, mw, (Color){220, 180, 90, 255});
+
+  DrawText("Q: mask", sw / 2 - MeasureText("Q: mask", 16) / 2, sh - 36, 16,
+           Fade(LIGHTGRAY, 0.85f));
+}
+
+inline void draw_main_scene_2d(
+    Camera& camera, CameraNavState& camera_nav, const GameState& state,
+    bool show_tronic_coords_debug,
+    const std::map<std::string, TronicPositionMap>& tronic_by_entity,
+    const Vector3& tronic_default_pos, bool is_freeroam,
+    bool p2_task_overlay_visible) {
   camera_nav.DrawPanel(state.is_player_one);
   char coord_text[64];
   std::snprintf(coord_text, sizeof(coord_text), "x: %.2f",
@@ -503,14 +674,31 @@ inline void draw_main_scene_2d(Camera& camera, CameraNavState& camera_nav,
     const char* label = state.is_player_one ? "Player 1" : "Player 2";
     DrawText(label, 10, 64, 16, WHITE);
   }
+  if (state.gameStarted) {
+    char pbuf[48];
+    std::snprintf(pbuf, sizeof(pbuf), "Power: %d / 100", state.power);
+    const int sw = GetScreenWidth();
+    DrawText(pbuf, sw - 200, 10, 18, GOLD);
+    if (state.is_player_one && (!state.p2_in_lobby || state.p2_lost)) {
+      DrawText("SPACE: add power (half P2 rate)", sw - 320, 32, 14,
+               Fade(SKYBLUE, 0.9f));
+    }
+  }
   if (!state.is_player_one) {
     const char* mask_label = state.p2_mask_down ? "Mask: DOWN" : "Mask: UP";
     Color mask_color = state.p2_mask_down ? GREEN : ORANGE;
     DrawText(mask_label, 10, 82, 16, mask_color);
+    if (state.gameStarted && !state.p2_mask_down) {
+      DrawText("E: task panel (power / music)  |  hold J / L", 10, 100, 14,
+               Fade(SKYBLUE, 0.88f));
+    }
   }
   if (show_tronic_coords_debug) {
     draw_tronic_coords_debug_hud(state, tronic_by_entity, tronic_default_pos);
   }
+  draw_freeroam_tronic_room_labels(camera, camera_nav, state, tronic_by_entity,
+                                   tronic_default_pos, is_freeroam,
+                                   show_tronic_coords_debug);
   if (!state.check_camera_status.empty()) {
     const int hud_y = GetScreenHeight() - 48;
     Color hud_color = YELLOW;
@@ -527,18 +715,18 @@ inline void draw_main_scene_2d(Camera& camera, CameraNavState& camera_nav,
     for (const auto& ent : state.check_camera_entities) {
       if (line_y < 120)
         break;
-      std::string line =
-          std::to_string(ent.id) + std::string("  ") + ent.name;
+      std::string line = std::to_string(ent.id) + std::string("  ") + ent.name;
       DrawText(line.c_str(), 10, line_y, 16, RAYWHITE);
       line_y -= 18;
     }
   }
-  DrawText("Cam feed: C = entities in this cam room (after start)", 10, 100,
-           16, Fade(LIGHTGRAY, 0.85f));
-  DrawText("T = manual server sim step (after start)", 10, 118, 14,
+  DrawText("Cam feed: C = entities in this cam room (after start)", 10, 118, 16,
+           Fade(LIGHTGRAY, 0.85f));
+  DrawText("T = game step (sim + power/music tick)", 10, 136, 14,
            Fade(LIGHTGRAY, 0.75f));
-  DrawText("F3 = toggle tronic x,y,z (after start)", 10, 134, 14,
+  DrawText("F3 = toggle tronic x,y,z (after start)", 10, 152, 14,
            Fade(LIGHTGRAY, 0.75f));
+  draw_p2_task_overlay(state, p2_task_overlay_visible);
 }
 
 }  // namespace mainscene

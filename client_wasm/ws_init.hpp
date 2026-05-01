@@ -71,6 +71,15 @@ inline void send_mask_state(EMSCRIPTEN_WEBSOCKET_T socket, bool down) {
   send_json_message(socket, "action", content);
 }
 
+/// Hold state for generator/music (no broadcast). Applied on server game step (T).
+/// roles: "p1" | "p2power" | "p2music"
+inline void send_charge_hold(EMSCRIPTEN_WEBSOCKET_T socket, const char* role,
+                              bool held) {
+  const std::string content =
+      std::string("charge:") + role + ":" + (held ? "1" : "0");
+  send_json_message(socket, "action", content);
+}
+
 inline bool try_parse_json(const char* data, size_t len, json& out) {
   try {
     out = json::parse(std::string(data, len));
@@ -207,6 +216,14 @@ inline EM_BOOL on_message(int, const EmscriptenWebSocketMessageEvent* e,
           if (data.contains("p2MaskDown")) {
             state->p2_mask_down = data.value("p2MaskDown", false);
           }
+          if (data.contains("power"))
+            state->power = data.value("power", 30);
+          if (data.contains("musicBoxWind"))
+            state->music_box_wind = data.value("musicBoxWind", 0);
+          if (data.contains("p2InLobby"))
+            state->p2_in_lobby = data.value("p2InLobby", false);
+          if (data.contains("p2Lost"))
+            state->p2_lost = data.value("p2Lost", false);
           if (state->gameStarted && data.contains("simEntities") &&
               data["simEntities"].is_array()) {
             state->sim_entities.clear();

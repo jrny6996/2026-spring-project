@@ -49,6 +49,11 @@ class MainScene : public Scene {
   bool right_door_closed_ = false;
   float left_door_y_ = 6.5f;
   float right_door_y_ = 6.5f;
+  bool charge_sent_p1_ = false;
+  bool charge_sent_p2_power_ = false;
+  bool charge_sent_p2_music_ = false;
+  /// P2 full-screen generator/music UI (E); off by default so the office is visible.
+  bool p2_task_overlay_open_ = false;
 
   static constexpr float kDoorYDown = 2.5f;
   static constexpr float kDoorYUp = 6.5f;
@@ -71,6 +76,7 @@ class MainScene : public Scene {
     mainscene::assign_pbr_to_model(map_shader, toy_chica);
     mainscene::assign_pbr_to_model(map_shader, toy_foxy);
     mainscene::assign_pbr_to_model(map_shader, door);
+    mainscene::assign_pbr_to_model(map_shader, mask);
   }
   void update_doors(bool allow_input) {
     if (allow_input && IsKeyPressed(KEY_Q))
@@ -101,8 +107,17 @@ class MainScene : public Scene {
     DrawModel(door, {-4.0f, left_door_y_, -2.5f}, 1.0f, WHITE);
     DrawModel(door, {0.0f, right_door_y_, -2.5f}, 1.0f, WHITE);
   }
+  /// First-person mask held in front of P2; uses global camPos/yaw from office cam.
   void draw_mask() {
-    DrawModel(mask,{1.0f, 52.0f, 1.0f}, 1.0f, WHITE);
+    constexpr float kHoldDist = 2.0f;
+    constexpr float kEyeOffsetY = -0.25f;
+    constexpr float kScale = 0.14f;
+    Vector3 forward = {-sinf(yaw), 0.0f, -cosf(yaw)};
+    Vector3 pos = {camPos.x + forward.x * kHoldDist, camPos.y + kEyeOffsetY,
+                   camPos.z + forward.z * kHoldDist};
+    const Vector3 axis = {0.0f, 1.0f, 0.0f};
+    float rot_deg = yaw * RAD2DEG;
+    DrawModelEx(mask, pos, axis, rot_deg, {kScale, kScale, kScale}, WHITE);
   }
 
  public:
@@ -127,10 +142,10 @@ class MainScene : public Scene {
     static constexpr const char* kDoorPath = "assets/door.glb";
     static constexpr const char* kMaskPath = "assets/mask.glb";
     SceneAssetPreloader preloader;
-    preloader.PreloadAll({kFreddyPath, kBonniePath, kChicaPath, kFoxyPath,
-                          kToyFreddyPath, kToyBonniePath, kToyChicaPath,
-                          kToyFoxyPath, kMap1Path, kMap2Path},
-                         {kPbrVsPath, kPbrFsPath});
+    preloader.PreloadAll(
+        {kFreddyPath, kBonniePath, kChicaPath, kFoxyPath, kToyFreddyPath,
+         kToyBonniePath, kToyChicaPath, kToyFoxyPath, kMap1Path, kMap2Path},
+        {kPbrVsPath, kPbrFsPath});
     preloader.BeginServe();
 
     this->freddy = LoadModel(kFreddyPath);
@@ -218,12 +233,71 @@ class MainScene : public Scene {
       debug_tronic_coords_ = !debug_tronic_coords_;
     if (state.gameStarted && IsKeyPressed(KEY_T))
       ws::send_step(socket);
+    if (state.gameStarted && !state.is_player_one && IsKeyPressed(KEY_E)) {
+      p2_task_overlay_open_ = !p2_task_overlay_open_;
+    }
     if (state.gameStarted && !state.is_player_one && IsKeyPressed(KEY_Q)) {
       state.p2_mask_down = !state.p2_mask_down;
       ws::send_mask_state(socket, state.p2_mask_down);
       if (state.p2_mask_down) {
+        p2_task_overlay_open_ = false;
         camera_nav_.panel_open = false;
         camera_nav_.active_feed = -1;
+        if (charge_sent_p2_power_) {
+          ws::send_charge_hold(socket, "p2power", false);
+          charge_sent_p2_power_ = false;
+        }
+        if (charge_sent_p2_music_) {
+          ws::send_charge_hold(socket, "p2music", false);
+          charge_sent_p2_music_ = false;
+        }
+      }
+    }
+
+    if (state.gameStarted) {
+      if (state.is_player_one) {
+        const bool want_charge =
+            IsKeyDown(KEY_SPACE) && (!state.p2_in_lobby || state.p2_lost);
+        if (want_charge != charge_sent_p1_) {
+          ws::send_charge_hold(socket, "p1", want_charge);
+          charge_sent_p1_ = want_charge;
+        }
+      } else {
+        if (state.p2_mask_down) {
+          if (charge_sent_p2_power_) {
+            ws::send_charge_hold(socket, "p2power", false);
+            charge_sent_p2_power_ = false;
+          }
+          if (charge_sent_p2_music_) {
+            ws::send_charge_hold(socket, "p2music", false);
+            charge_sent_p2_music_ = false;
+          }
+        } else {
+          const bool p2p = IsKeyDown(KEY_J);
+          const bool p2m = IsKeyDown(KEY_L);
+          if (p2p != charge_sent_p2_power_) {
+            ws::send_charge_hold(socket, "p2power", p2p);
+            charge_sent_p2_power_ = p2p;
+          }
+          if (p2m != charge_sent_p2_music_) {
+            ws::send_charge_hold(socket, "p2music", p2m);
+            charge_sent_p2_music_ = p2m;
+          }
+        }
+      }
+    } else {
+      p2_task_overlay_open_ = false;
+      if (charge_sent_p1_) {
+        ws::send_charge_hold(socket, "p1", false);
+        charge_sent_p1_ = false;
+      }
+      if (charge_sent_p2_power_) {
+        ws::send_charge_hold(socket, "p2power", false);
+        charge_sent_p2_power_ = false;
+      }
+      if (charge_sent_p2_music_) {
+        ws::send_charge_hold(socket, "p2music", false);
+        charge_sent_p2_music_ = false;
       }
     }
     if (state.gameStarted && state.is_player_one) {
@@ -273,7 +347,8 @@ class MainScene : public Scene {
     EndMode3D();
     mainscene::draw_main_scene_2d(this->camera, camera_nav_, state,
                                   debug_tronic_coords_, this->tronic_maps_,
-                                  this->freddyInitialPos);
+                                  this->freddyInitialPos, this->is_freeroam,
+                                  p2_task_overlay_open_);
     EndDrawing();
   }
 

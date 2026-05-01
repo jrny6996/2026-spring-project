@@ -42,15 +42,22 @@ type GameRoomState struct {
 	Accepted        bool       `json:"accepted"`
 	Acceptor        string     `json:"acceptor"`
 	Power           int        `json:"power"`
+	MusicBoxWind    int        `json:"musicBoxWind"` // 0–100; P2 winds on right panel
 	LHSDoorDown     bool       `json:"lhsDoorDown"`
 	RHSDoorDown     bool       `json:"rhsDoorDown"`
 	P2MaskDown      bool       `json:"p2MaskDown"`
 	P2OfficeDanger  int        `json:"p2OfficeDanger"`
 	P1Lost          bool       `json:"-"`
-	P2Lost          bool       `json:"-"`
+	P2Lost          bool       `json:"p2Lost"`
 	Rooms           []Room     `json:"rooms"`
 	HostIsPlayerOne bool       `json:"-"`
 	Sim             *GameState `json:"-"`
+
+	// Charge holds (set via websocket); applied once per game step in applyChargeEconomyTick.
+	p1ChargeHeld  bool
+	p2PowerHeld   bool
+	p2MusicHeld   bool
+	p1ChargePulse int // P1 adds power every 2 steps (half P2 rate)
 }
 
 // SimEntityWire is a single animatronic position in the live sim (for clients).
@@ -65,11 +72,16 @@ type gameStateWire struct {
 	GameRoomState
 	LobbyID     string          `json:"lobbyId"`
 	IsPlayerOne bool            `json:"isPlayerOne"`
+	P2InLobby   bool            `json:"p2InLobby"` // second player joined this lobby
 	SimEntities []SimEntityWire `json:"simEntities,omitempty"`
 }
 
 func stateForClient(room *GameRoomState, remoteAddr, lobbyID string) gameStateWire {
-	w := gameStateWire{GameRoomState: *room, LobbyID: lobbyID}
+	w := gameStateWire{
+		GameRoomState: *room,
+		LobbyID:       lobbyID,
+		P2InLobby:     room.Accepted && room.Acceptor != "",
+	}
 	switch remoteAddr {
 	case room.Host:
 		w.IsPlayerOne = room.HostIsPlayerOne
@@ -249,6 +261,43 @@ func isPlayerTwoUser(room *GameRoomState, remote string) bool {
 	return false
 }
 
+// applyChargeEconomyTick runs generator + music box once per game step (manual step only).
+func applyChargeEconomyTick(room *GameRoomState) {
+	if room == nil {
+		return
+	}
+	p2PartnerLive := room.Accepted && room.Acceptor != "" && !room.P2Lost
+	canP1Charge := !p2PartnerLive || room.P2Lost
+	if !canP1Charge {
+		room.p1ChargeHeld = false
+	}
+
+	if room.p1ChargeHeld && canP1Charge {
+		room.p1ChargePulse++
+		if room.p1ChargePulse >= 2 {
+			room.Power++
+			room.p1ChargePulse = 0
+		}
+	} else {
+		room.p1ChargePulse = 0
+	}
+
+	if room.p2PowerHeld && !room.P2Lost && !room.P2MaskDown {
+		room.Power++
+	}
+	if room.p2MusicHeld && !room.P2Lost && !room.P2MaskDown {
+		if room.MusicBoxWind < 100 {
+			room.MusicBoxWind += 4
+		}
+	}
+	if room.MusicBoxWind > 0 {
+		room.MusicBoxWind--
+	}
+	if room.Power > 100 {
+		room.Power = 100
+	}
+}
+
 // runSimStepTicker advances night time and the sim for each started lobby
 // on a single shared interval (one tick every 10s; each lobby has its own room).
 func runSimStepTicker() {
@@ -395,6 +444,7 @@ func newGameRoomState(host string) GameRoomState {
 		Accepted:       false,
 		Acceptor:       "",
 		Power:          30,
+		MusicBoxWind:   0,
 		LHSDoorDown:    false,
 		RHSDoorDown:    false,
 		P2MaskDown:     false,
@@ -500,12 +550,17 @@ func handleStartGame(conn *websocket.Conn, r *http.Request) {
 	room.HostIsPlayerOne = rand.Intn(2) == 1
 	room.Started = true
 	room.Power = 30
+	room.MusicBoxWind = 0
 	room.LHSDoorDown = false
 	room.RHSDoorDown = false
 	room.P2MaskDown = false
 	room.P2OfficeDanger = 0
 	room.P1Lost = false
 	room.P2Lost = false
+	room.p1ChargeHeld = false
+	room.p2PowerHeld = false
+	room.p2MusicHeld = false
+	room.p1ChargePulse = 0
 	room.Sim = NewGameState()
 	room.Sim.SpawnEntities()
 	log.Printf("lobby %s: SpawnEntities done, sim ready", user.LobbyID)
@@ -534,6 +589,7 @@ func handleStepGame(conn *websocket.Conn, r *http.Request) {
 	if room.RHSDoorDown {
 		room.Power--
 	}
+	applyChargeEconomyTick(room)
 	if room.Power <= 0 {
 		handleLobbyLose(user.LobbyID, "power_out")
 		return
@@ -580,11 +636,40 @@ func handleActionGame(conn *websocket.Conn, r *http.Request, content string) {
 		return
 	}
 	parts := strings.Split(content, ":")
-	if len(parts) != 3 {
+	if len(parts) < 2 {
 		return
 	}
 	switch parts[0] {
+	case "charge":
+		if len(parts) != 3 {
+			return
+		}
+		on := parts[2] == "1" || parts[2] == "on"
+		switch parts[1] {
+		case "p1":
+			if !isPlayerOneUser(room, r.RemoteAddr) {
+				return
+			}
+			room.p1ChargeHeld = on
+		case "p2power":
+			if !isPlayerTwoUser(room, r.RemoteAddr) {
+				return
+			}
+			room.p2PowerHeld = on
+		case "p2music":
+			if !isPlayerTwoUser(room, r.RemoteAddr) {
+				return
+			}
+			room.p2MusicHeld = on
+		default:
+			return
+		}
+		// Holds only; state broadcasts on the next game step (T).
+		return
 	case "door":
+		if len(parts) != 3 {
+			return
+		}
 		if !isPlayerOneUser(room, r.RemoteAddr) {
 			return
 		}
@@ -603,6 +688,9 @@ func handleActionGame(conn *websocket.Conn, r *http.Request, content string) {
 			}
 		}
 	case "mask":
+		if len(parts) != 3 {
+			return
+		}
 		if !isPlayerTwoUser(room, r.RemoteAddr) {
 			log.Printf("lobby %s: ignored mask action from non-P2 remote=%s content=%q", user.LobbyID, r.RemoteAddr, content)
 			return
@@ -611,6 +699,10 @@ func handleActionGame(conn *websocket.Conn, r *http.Request, content string) {
 			return
 		}
 		room.P2MaskDown = parts[2] == "down"
+		if room.P2MaskDown {
+			room.p2PowerHeld = false
+			room.p2MusicHeld = false
+		}
 		log.Printf("lobby %s: p2 mask set to %v by remote=%s", user.LobbyID, room.P2MaskDown, r.RemoteAddr)
 		// If mask goes down after an entry race, immediately deflect office occupants.
 		if room.P2MaskDown && room.Sim.AnyEntityInRoom("player_two_office") {

@@ -497,8 +497,10 @@ func (gs *GameState) FirstEntityNameInRoom(alias string) (string, bool) {
 	return "", false
 }
 
-// MoveEntitiesBackFromRoom moves every entity currently in `alias` one step back
-// along its tracked path. Used for mask/office deflection behavior.
+// MoveEntitiesBackFromRoom repels entities currently in `alias` (P2 office) along
+// their path until they are no longer in the office or in hallway_close_before_office.
+// A single MoveBack would leave them on the close-hall node, and the next Step would
+// walk them straight back into the office; retreating through both rooms fixes that.
 func (gs *GameState) MoveEntitiesBackFromRoom(alias string) {
 	if gs == nil || gs.Tracker == nil || alias == "" {
 		return
@@ -510,10 +512,6 @@ func (gs *GameState) MoveEntitiesBackFromRoom(alias string) {
 		}
 	}
 	for _, id := range ids {
-		path := gs.Tracker.EntityPaths[id]
-		if len(path) <= 1 {
-			continue
-		}
 		curr := gs.Tracker.EntityPositions[id]
 		if curr == nil {
 			continue
@@ -527,7 +525,18 @@ func (gs *GameState) MoveEntitiesBackFromRoom(alias string) {
 				break
 			}
 		}
-		if found {
+		if !found {
+			continue
+		}
+		for gs.Tracker.EntityPositions[id] != nil {
+			n := gs.Tracker.EntityPositions[id]
+			if n.AliasName != "player_two_office" &&
+				n.AliasName != "hallway_close_before_office" {
+				break
+			}
+			if len(gs.Tracker.EntityPaths[id]) <= 1 {
+				break
+			}
 			gs.Tracker.MoveBack(ent)
 		}
 	}

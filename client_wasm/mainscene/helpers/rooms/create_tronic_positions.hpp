@@ -70,6 +70,8 @@ inline std::string tronic_3d_pos_key(int entity_id,
   if (!sim_room_alias || sim_room_alias[0] == '\0')
     return {};
   const std::string a(sim_room_alias);
+  if (a == "player_two_office")
+    return "p2_player_two_office";
   if (entity_id >= 1 && entity_id <= 4)
     return a;
   if (entity_id >= 11) {
@@ -85,15 +87,14 @@ inline std::string tronic_3d_pos_key(int entity_id,
       return "p2_rhs_party_one";
     if (a == "rhs_party_two")
       return "p2_rhs_party_two";
-    if (a == "p2_rhs_hall")
-      return "p2_rhs_hall";
-    if (a == "p2_lhs_hall")
-      return "p2_lhs_hall";
+    // Side halls feed the same sim node as hallway_close_before_office; use that
+    // 3D anchor (last step before player_two_office).
+    if (a == "p2_rhs_hall" || a == "p2_lhs_hall")
+      return "p2_hallway_close_before_office";
     if (a == "middle_hall_two" || a == "middle_hall_one" ||
         a == "center_door" || a == "facade" || a == "lhs_vent" ||
         a == "rhs_vent" || a == "hallway_far_before_office" ||
-        a == "hallway_close_before_office"  ||
-        a == "p2_mangle_room")
+        a == "hallway_close_before_office" || a == "p2_mangle_room")
       return "p2_" + a;
   }
   return a;
@@ -115,21 +116,19 @@ inline TronicPositionMap make_tronic_layout(const Model& model) {
        {"lhs_closet", {{-3.35f, 2.5f, 3.5f}, {0, 1, 0}, 180.0f}},
        {"rhs_closet", {{3.35f, 2.5f, 3.5f}, {0, 1, 0}, 180.0f}},
 
-       {"p2_lhs_party", {{-8.0f, 50.0f, -20.0f}, {0, 1, 0}, 0.0f}},
+       {"p2_lhs_party", {{-9.0f, 50.0f, -22.0f}, {0, 1, 0}, 0.0f}},
        {"p2_lhs_party_two", {{-8.0f, 50.0f, -13.0f}, {0, 1, 0}, 0.0f}},
-       {"p2_lhs_hall", {{-2.0f, 52.0f, -8.0f}, {0, 1, 0}, 0.0f}},
-       {"p2_rhs_hall", {{2.0f, 52.0f, -8.0f}, {0, 1, 0}, 0.0f}},
        {"p2_lhs_repair", {{-7.0f, 52.0f, -26.0f}, {0, 1, 0}, 0.0f}},
-       {"p2_rhs_party_one", {{8.0f, 52.0f, -24.0f}, {0, 1, 0}, 180.0f}},
-       {"p2_rhs_party_two", {{8.0f, 52.0f, -12.0f}, {0, 1, 0}, 0.0f}},
+       {"p2_rhs_party_one", {{1.0f, 50.0f, -22.0f}, {0, 1, 0}, 180.0f}},
+       {"p2_rhs_party_two", {{10.0f, 50.0f, -9.0f}, {0, 1, 0}, 0.0f}},
 
        {"p2_middle_hall_two", {{0.0f, 50.0f, -25.0f}, {0, 1, 0}, 0.0f}},
        {"p2_hallway_far_before_office",
-        {{16.0f, 50.0f, -5.5f}, {0, 1, 0}, 0.0f}},
+        {{1.0f, 50.0f, -25.5f}, {0, 1, 0}, 0.0f}},
        {"p2_hallway_close_before_office",
         {{0.0f, 50.0f, -12.5f}, {0, 1, 0}, 0.0f}},
-       {"p2_player_two_office", {{0.0f, 48.0f, -1.0f}, {0, 1, 0}, 180.0f}},
-       {"p2_toy_stage", {{33.0f, 50.0f, -37.0f}, {0, 1, 0}, 0.0f}},
+       {"p2_player_two_office", {{0.0f, 50.0f, -6.0f}, {0, 1, 0}, 0.0f}},
+       {"p2_toy_stage", {{33.0f, 50.0f, -41.0f}, {0, 1, 0}, 0.0f}},
        {"toy_stage", {{0.0f, 0.0f, 0.0f}, {0, 1, 0}, 0.0f}}});
   return m;
 }
@@ -159,16 +158,14 @@ inline std::map<std::string, TronicPositionMap> create_tronic_positions(
   TronicPositionMap& freddy_map = out.at("freddy");
 
   auto& freddy_pos = freddy_map.pos_map;
-    auto& freddy_party = freddy_pos.at("party_room");
-    freddy_party = {8.7f, 2.5f, -31.0f};
+  auto& freddy_party = freddy_pos.at("party_room");
+  freddy_party = {8.7f, 2.5f, -31.0f};
 
   auto& chica_pos = chica_map.pos_map;
   auto& chica_rhs = chica_pos.at("rhs_hall");
   auto& chica_party = chica_pos.at("party_room");
   chica_party = {-10.0f, 2.5f, -21.0f};
   chica_rhs.position = {2.8f, 2.5f, -8.0f};
-
-
 
   return out;
 }

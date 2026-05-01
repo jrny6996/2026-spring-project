@@ -37,22 +37,19 @@ type Room struct {
 }
 
 type GameRoomState struct {
-	Time           int16  `json:"time"`
-	Started        bool   `json:"started"`
-	Host           string `json:"host"`
-	Accepted       bool   `json:"accepted"`
-	Acceptor       string `json:"acceptor"`
-	Power          int    `json:"power"`
-	MusicBoxWind   int    `json:"musicBoxWind"` // 0–100; P2 winds on right panel
-	LHSDoorDown    bool   `json:"lhsDoorDown"`
-	RHSDoorDown    bool   `json:"rhsDoorDown"`
-	P2MaskDown     bool   `json:"p2MaskDown"`
-	P2OfficeDanger int    `json:"p2OfficeDanger"`
-	P1Lost         bool   `json:"-"`
-	P2Lost         bool   `json:"p2Lost"`
-	// One-shot per broadcast: animatronic retreated from a blocked P1 door (for SFX).
-	DoorPoundLhs    bool       `json:"doorPoundLhs"`
-	DoorPoundRhs    bool       `json:"doorPoundRhs"`
+	Time            int16      `json:"time"`
+	Started         bool       `json:"started"`
+	Host            string     `json:"host"`
+	Accepted        bool       `json:"accepted"`
+	Acceptor        string     `json:"acceptor"`
+	Power           int        `json:"power"`
+	MusicBoxWind    int        `json:"musicBoxWind"` // 0–100; P2 winds on right panel
+	LHSDoorDown     bool       `json:"lhsDoorDown"`
+	RHSDoorDown     bool       `json:"rhsDoorDown"`
+	P2MaskDown      bool       `json:"p2MaskDown"`
+	P2OfficeDanger  int        `json:"p2OfficeDanger"`
+	P1Lost          bool       `json:"-"`
+	P2Lost          bool       `json:"p2Lost"`
 	Rooms           []Room     `json:"rooms"`
 	HostIsPlayerOne bool       `json:"-"`
 	Sim             *GameState `json:"-"`
@@ -131,8 +128,6 @@ func broadcastStateToLobby(lobbyID string) {
 		}
 		writeJSONToUser(u, "state", stateForClient(room, u.Remote, lobbyID))
 	}
-	room.DoorPoundLhs = false
-	room.DoorPoundRhs = false
 }
 
 func handleNightEnd(lobbyID string) {
@@ -596,9 +591,6 @@ func handleStepGame(conn *websocket.Conn, r *http.Request) {
 		return
 	}
 	room.Sim.Step(user.LobbyID)
-	lhsPound, rhsPound := room.Sim.ConsumeDoorPoundFlags()
-	room.DoorPoundLhs = lhsPound
-	room.DoorPoundRhs = rhsPound
 	if room.Sim.AnyEntityInRoom("player_one_office") {
 		killer, _ := room.Sim.FirstEntityNameInRoom("player_one_office")
 		handlePlayerOneLose(user.LobbyID, killer)

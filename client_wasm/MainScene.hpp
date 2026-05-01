@@ -52,12 +52,6 @@ class MainScene : public Scene {
   /// P2 full-screen generator/music UI (E); off by default so the office is visible.
   bool p2_task_overlay_open_ = false;
 
-  Music ambience_music_{};
-  Sound door_pound_sound_{};
-  bool ambience_playing_ = false;
-  bool prev_door_pound_lhs_ = false;
-  bool prev_door_pound_rhs_ = false;
-
   static constexpr float kDoorYDown = 2.5f;
   static constexpr float kDoorYUp = 6.5f;
   static constexpr float kDoorMoveSpeed = 8.0f;
@@ -143,15 +137,11 @@ class MainScene : public Scene {
     static constexpr const char* kPbrVsPath = "assets/shaders/glsl100/pbr.vs";
     static constexpr const char* kPbrFsPath = "assets/shaders/glsl100/pbr.fs";
     static constexpr const char* kDoorPath = "assets/door.glb";
-    static constexpr const char* kMaskPath = "assets/mask.glb";
-    static constexpr const char* kAmbienceMp3Path = "assets/sound/Ambience 2.mp3";
-    static constexpr const char* kDoorPoundMp3Path =
-        "assets/sound/Door Pounding Me.mp3";
+    static constexpr const char* kMaskPath = "assets/freddy_mask.glb";
     SceneAssetPreloader preloader;
     preloader.PreloadAll(
         {kFreddyPath, kBonniePath, kChicaPath, kFoxyPath, kToyFreddyPath,
-         kToyBonniePath, kToyChicaPath, kToyFoxyPath, kMap1Path, kMap2Path,
-         kAmbienceMp3Path, kDoorPoundMp3Path},
+         kToyBonniePath, kToyChicaPath, kToyFoxyPath, kMap1Path, kMap2Path},
         {kPbrVsPath, kPbrFsPath});
     preloader.BeginServe();
 
@@ -203,29 +193,6 @@ class MainScene : public Scene {
     this->camera.fovy = 50.0f;
     this->camera.target.x = -1.0f;
     this->camera.target.z = 10.0f;
-
-    if (IsAudioDeviceReady()) {
-      ambience_music_ = LoadMusicStream(kAmbienceMp3Path);
-      if (IsMusicValid(ambience_music_)) {
-        ambience_music_.looping = true;
-        SetMusicVolume(ambience_music_, 0.45f);
-      }
-      door_pound_sound_ = LoadSound(kDoorPoundMp3Path);
-      if (IsSoundValid(door_pound_sound_)) {
-        SetSoundVolume(door_pound_sound_, 0.85f);
-      }
-    }
-  }
-
-  ~MainScene() {
-    if (IsMusicValid(ambience_music_)) {
-      UnloadMusicStream(ambience_music_);
-      ambience_music_ = Music{};
-    }
-    if (IsSoundValid(door_pound_sound_)) {
-      UnloadSound(door_pound_sound_);
-      door_pound_sound_ = Sound{};
-    }
   }
 
   bool set_pbr_light_enabled(int index, bool enabled) {
@@ -250,29 +217,6 @@ class MainScene : public Scene {
   void update(Scene*& curr_scene, GameState& state,
               EMSCRIPTEN_WEBSOCKET_T& socket) override {
     (void)curr_scene;
-    if (IsAudioDeviceReady() && IsMusicValid(ambience_music_)) {
-      UpdateMusicStream(ambience_music_);
-    }
-    if (state.gameStarted) {
-      if (IsMusicValid(ambience_music_) && !ambience_playing_) {
-        PlayMusicStream(ambience_music_);
-        ambience_playing_ = true;
-      }
-      if (state.is_player_one &&
-          ((state.door_pound_lhs && !prev_door_pound_lhs_) ||
-           (state.door_pound_rhs && !prev_door_pound_rhs_))) {
-        if (IsSoundValid(door_pound_sound_))
-          PlaySound(door_pound_sound_);
-      }
-    } else {
-      if (ambience_playing_ && IsMusicValid(ambience_music_)) {
-        StopMusicStream(ambience_music_);
-        ambience_playing_ = false;
-      }
-    }
-    prev_door_pound_lhs_ = state.door_pound_lhs;
-    prev_door_pound_rhs_ = state.door_pound_rhs;
-
     mainscene::process_check_camera_restore(state, camera_nav_);
     const bool p2_cam_blocked = !state.is_player_one && state.p2_mask_down;
     if (!p2_cam_blocked) {

@@ -44,9 +44,6 @@ class GameState {
   bool p2_in_lobby = false;
   /// P2 eliminated; P1 may use SPACE to charge at half rate.
   bool p2_lost = false;
-  /// Server one-shot when a blocked P1 door sent an animatronic back (`doorPoundLhs` / `Rhs`).
-  bool door_pound_lhs = false;
-  bool door_pound_rhs = false;
 
   /// Security-camera check: server round-trip in progress; feed is suspended.
   bool check_camera_in_flight = false;

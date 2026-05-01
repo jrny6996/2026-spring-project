@@ -249,8 +249,6 @@ inline EM_BOOL on_message(int, const EmscriptenWebSocketMessageEvent* e,
           // never block P1 after lobby/game changes.
           state->p2_in_lobby = data.value("p2InLobby", false);
           state->p2_lost = data.value("p2Lost", false);
-          state->door_pound_lhs = data.value("doorPoundLhs", false);
-          state->door_pound_rhs = data.value("doorPoundRhs", false);
           if (state->gameStarted && data.contains("simEntities") &&
               data["simEntities"].is_array()) {
             state->sim_entities.clear();

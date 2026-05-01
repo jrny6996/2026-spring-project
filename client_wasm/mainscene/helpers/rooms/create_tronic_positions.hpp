@@ -11,12 +11,16 @@ struct TronicCharacterSpec {
   Vector3 character_offset;
 };
 
-/// The four classic characters; toy entities reuse the same spec as their mesh.
+/// Classic FNaF1 lineup plus second–floor toy line meshes (2F sim ids 11–14).
 struct TronicRosterSpec {
   TronicCharacterSpec freddy;
   TronicCharacterSpec bonnie;
   TronicCharacterSpec chica;
   TronicCharacterSpec foxy;
+  TronicCharacterSpec toy_freddy;
+  TronicCharacterSpec toy_bonnie;
+  TronicCharacterSpec toy_chica;
+  TronicCharacterSpec toy_foxy;
 };
 
 /// Maps a live sim row to the tronic map key (freddy, bonnie, …). Lowercases
@@ -145,10 +149,10 @@ inline std::map<std::string, TronicPositionMap> create_tronic_positions(
   out.emplace("bonnie", make_tronic_map(roster.bonnie));
   out.emplace("chica", make_tronic_map(roster.chica));
   out.emplace("foxy", make_tronic_map(roster.foxy));
-  out.emplace("toy_freddy", make_tronic_map(roster.freddy));
-  out.emplace("toy_bonnie", make_tronic_map(roster.bonnie));
-  out.emplace("toy_chica", make_tronic_map(roster.chica));
-  out.emplace("toy_foxy", make_tronic_map(roster.foxy));
+  out.emplace("toy_freddy", make_tronic_map(roster.toy_freddy));
+  out.emplace("toy_bonnie", make_tronic_map(roster.toy_bonnie));
+  out.emplace("toy_chica", make_tronic_map(roster.toy_chica));
+  out.emplace("toy_foxy", make_tronic_map(roster.toy_foxy));
 
   // special positions
   TronicPositionMap& chica_map = out.at("chica");

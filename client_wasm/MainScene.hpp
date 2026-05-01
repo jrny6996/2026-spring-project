@@ -30,6 +30,10 @@ class MainScene : public Scene {
   Model bonnie;
   Model chica;
   Model foxy;
+  Model toy_freddy;
+  Model toy_bonnie;
+  Model toy_chica;
+  Model toy_foxy;
   Model door;
   Vector3 freddyInitialPos;
   Camera& camera;
@@ -62,6 +66,10 @@ class MainScene : public Scene {
     mainscene::assign_pbr_to_model(map_shader, bonnie);
     mainscene::assign_pbr_to_model(map_shader, chica);
     mainscene::assign_pbr_to_model(map_shader, foxy);
+    mainscene::assign_pbr_to_model(map_shader, toy_freddy);
+    mainscene::assign_pbr_to_model(map_shader, toy_bonnie);
+    mainscene::assign_pbr_to_model(map_shader, toy_chica);
+    mainscene::assign_pbr_to_model(map_shader, toy_foxy);
     mainscene::assign_pbr_to_model(map_shader, door);
   }
   void update_doors(bool allow_input) {
@@ -107,6 +115,11 @@ class MainScene : public Scene {
         "assets/fnaf_1_bonnie_by_thudner.glb";
     static constexpr const char* kChicaPath = "assets/chica.glb";
     static constexpr const char* kFoxyPath = "assets/rynfox_fnaf_1_foxy_v6.glb";
+    static constexpr const char* kToyFreddyPath =
+        "assets/toy_freddy_v2_fixed.glb";
+    static constexpr const char* kToyBonniePath = "assets/toy_bonnie.glb";
+    static constexpr const char* kToyChicaPath = "assets/toy_chica.glb";
+    static constexpr const char* kToyFoxyPath = "assets/fnaf_mangle.glb";
     static constexpr const char* kMap1Path = "assets/fnaf_1_hw_map.glb";
     static constexpr const char* kMap2Path = "assets/fnaf_2_hw_map_updated.glb";
     static constexpr const char* kPbrVsPath = "assets/shaders/glsl100/pbr.vs";
@@ -114,15 +127,20 @@ class MainScene : public Scene {
     static constexpr const char* kDoorPath = "assets/door.glb";
     static constexpr const char* kMaskPath = "assets/mask.glb";
     SceneAssetPreloader preloader;
-    preloader.PreloadAll(
-        {kFreddyPath, kBonniePath, kChicaPath, kFoxyPath, kMap1Path, kMap2Path},
-        {kPbrVsPath, kPbrFsPath});
+    preloader.PreloadAll({kFreddyPath, kBonniePath, kChicaPath, kFoxyPath,
+                          kToyFreddyPath, kToyBonniePath, kToyChicaPath,
+                          kToyFoxyPath, kMap1Path, kMap2Path},
+                         {kPbrVsPath, kPbrFsPath});
     preloader.BeginServe();
 
     this->freddy = LoadModel(kFreddyPath);
     this->bonnie = LoadModel(kBonniePath);
     this->chica = LoadModel(kChicaPath);
     this->foxy = LoadModel(kFoxyPath);
+    this->toy_freddy = LoadModel(kToyFreddyPath);
+    this->toy_bonnie = LoadModel(kToyBonniePath);
+    this->toy_chica = LoadModel(kToyChicaPath);
+    this->toy_foxy = LoadModel(kToyFoxyPath);
     this->map = LoadModel(kMap1Path);
     this->p_map = LoadModel(kMap2Path);
     this->door = LoadModel(kDoorPath);
@@ -152,6 +170,10 @@ class MainScene : public Scene {
         {this->bonnie, {0.045f, 0.045f, 0.045f}, {-2.15f, 0.0f, 0.35f}},
         {this->chica, {0.068f, 0.068f, 0.068f}, {2.15f, 0.0f, 0.35f}},
         {this->foxy, {0.048f, 0.048f, 0.048f}, {0.0f, 0.0f, -0.95f}},
+        {this->toy_freddy, {0.015f, 0.015f, 0.015f}, {0.0f, 0.0f, 0.35f}},
+        {this->toy_bonnie, {2.015f, 2.015f, 2.015f}, {0.15f, 0.0f, 0.35f}},
+        {this->toy_chica, {1.5f, 1.5f, 1.5f}, {0.15f, 0.0f, 0.35f}},
+        {this->toy_foxy, {1.2f, 1.2f, 1.2f}, {0.0f, 0.0f, 0.6f}},
     };
     this->tronic_maps_ = create_tronic_positions(tronic_roster);
     animatronic_models_ = {&this->freddy, &this->bonnie, &this->chica,

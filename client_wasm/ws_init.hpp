@@ -167,6 +167,12 @@ inline EM_BOOL on_message(int, const EmscriptenWebSocketMessageEvent* e,
         } else if (status == "win") {
           state->check_camera_status = "You win";
           state->gameStarted = false;
+        } else if (status == "peer-disconnected") {
+          state->check_camera_status = "Other player disconnected";
+          state->gameStarted = false;
+          state->lobbyId.clear();
+          state->lobby_created = false;
+          state->has_player_slot = false;
         }
       }
       if (parsed.contains("type") && parsed["type"] == "error") {

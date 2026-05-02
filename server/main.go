@@ -388,6 +388,7 @@ func main() {
 		for {
 			_, msg, err := conn.ReadMessage()
 			if err != nil {
+				handleDisconnect(addr)
 				return
 			}
 			fmt.Printf("%s", msg)
@@ -754,4 +755,38 @@ func cleanupLobby(lobbyID string) {
 			user.LobbyID = ""
 		}
 	}
+}
+
+// handleDisconnect runs when a WebSocket read fails or the client closes the connection.
+// It notifies other players in the same lobby, then removes the lobby so idle games do not
+// accumulate on the server.
+func handleDisconnect(remote string) {
+	user := connectedUsersSet[remote]
+	if user == nil {
+		return
+	}
+	lobbyID := user.LobbyID
+	if lobbyID == "" {
+		user.Conn = nil
+		return
+	}
+	if _, ok := lobbySet[lobbyID]; !ok {
+		user.LobbyID = ""
+		user.Conn = nil
+		return
+	}
+
+	for _, u := range connectedUsersSet {
+		if u == nil || u.LobbyID != lobbyID || u.Remote == remote || u.Conn == nil {
+			continue
+		}
+		writeJSONToUser(u, "status", "peer-disconnected")
+		u.WriteMu.Lock()
+		_ = u.Conn.Close()
+		u.Conn = nil
+		u.WriteMu.Unlock()
+	}
+
+	cleanupLobby(lobbyID)
+	user.Conn = nil
 }

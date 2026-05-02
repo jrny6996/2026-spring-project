@@ -106,7 +106,7 @@ class MainScene : public Scene {
   }
   /// First-person mask held in front of P2; uses global camPos/yaw from office cam.
   void draw_mask() {
-    constexpr float kHoldDist = 0.2f;
+    constexpr float kHoldDist = 0.1f;
     constexpr float kEyeOffsetY = -0.70f;
     constexpr float kScale = 0.14f;
     Vector3 forward = {-sinf(yaw), 0.0f, -cosf(yaw)};

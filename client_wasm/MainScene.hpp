@@ -183,14 +183,14 @@ class MainScene : public Scene {
 
     enable_pbr();
     const TronicRosterSpec tronic_roster{
-        {this->freddy, {50.0f, 50.0f, 50.0f}, {1.0f, 0.0f, 1.0f}},
-        {this->bonnie, {0.045f, 0.045f, 0.045f}, {-2.15f, 0.0f, 0.35f}},
+        {this->freddy, {0.5f, 0.5f, 0.5f}, {1.0f, 0.0f, 1.0f}},
+        {this->bonnie, {0.0045f, 0.0045f, 0.0045f}, {0.0f, 0.0f, 0.0f}},
         {this->chica, {0.068f, 0.068f, 0.068f}, {2.15f, 0.0f, 0.35f}},
-        {this->foxy, {0.048f, 0.048f, 0.048f}, {0.0f, 0.0f, -0.95f}},
-        {this->toy_freddy, {0.015f, 0.015f, 0.015f}, {0.0f, 0.0f, 0.35f}},
-        {this->toy_bonnie, {0.15f, 0.15f, 0.15f}, {0.15f, 0.0f, 0.35f}},
-        {this->toy_chica, {0.75f, 0.75f, 0.75f}, {0.5f, 0.0f, 0.35f}},
-        {this->toy_foxy, {1.2f, 1.2f, 1.2f}, {0.0f, 0.0f, 0.6f}},
+        {this->foxy, {0.48f, 0.48f, 0.48f}, {0.0f, 0.0f, 0.0f}},
+        {this->toy_freddy, {1.15f, 1.15f, 1.15f}, {0.0f, 0.0f, 0.0f}},
+        {this->toy_bonnie, {0.25f, 0.25f, 0.25f}, {0.0f, 0.0f, 0.0f}},
+        {this->toy_chica, {0.75f, 0.75f, 0.75f}, {0.0f, 0.0f, 0.0f}},
+        {this->toy_foxy, {1.2f, 1.2f, 1.2f},{0.0f, 0.0f, 0.0f}},
     };
     this->tronic_maps_ = create_tronic_positions(tronic_roster);
     animatronic_models_ = {&this->freddy, &this->bonnie, &this->chica,

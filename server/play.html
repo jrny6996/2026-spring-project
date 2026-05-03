@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Night select — FNAF co-op</title>
+  <style>
+    :root {
+      --bg: #0a0e14;
+      --panel: #121a24;
+      --accent: #c9a227;
+      --text: #e6e8eb;
+      --muted: #7a8490;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: ui-sans-serif, system-ui, sans-serif;
+      background: radial-gradient(ellipse 120% 80% at 50% -20%, #1a2840 0%, var(--bg) 55%);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+    }
+    h1 {
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      font-size: 1.35rem;
+      margin: 0 0 0.35rem;
+      color: var(--accent);
+    }
+    p.sub { margin: 0 0 1.75rem; color: var(--muted); font-size: 0.9rem; max-width: 28rem; text-align: center; line-height: 1.5; }
+    .muted { color: var(--muted); font-size: 0.85rem; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 0.65rem;
+      max-width: 22rem;
+      margin-bottom: 1.25rem;
+    }
+    @media (max-width: 520px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+    button.night {
+      appearance: none;
+      border: 1px solid #2a3544;
+      background: var(--panel);
+      color: var(--text);
+      padding: 0.85rem 0.5rem;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s, transform 0.1s;
+    }
+    button.night:hover {
+      border-color: var(--accent);
+      background: #1a2430;
+    }
+    button.night.selected {
+      border-color: var(--accent);
+      background: #252d18;
+      box-shadow: 0 0 0 1px rgba(201, 162, 39, 0.35);
+    }
+    button.night:disabled {
+      cursor: not-allowed;
+      opacity: 0.42;
+    }
+    .launch {
+      appearance: none;
+      border: none;
+      background: linear-gradient(180deg, #d4b43a, #a88418);
+      color: #1a1505;
+      font-weight: 600;
+      padding: 0.75rem 1.75rem;
+      border-radius: 8px;
+      font-size: 1rem;
+      cursor: pointer;
+      margin-top: 0.25rem;
+    }
+    .launch:hover { filter: brightness(1.06); }
+    .launch:disabled { opacity: 0.45; cursor: not-allowed; filter: none; }
+    footer { margin-top: 2rem; font-size: 0.8rem; color: var(--muted); }
+    footer a { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <h1>Select night</h1>
+  <p class="sub">Guests: nights 1–2 only. Logged-in: night <strong>N</strong> unlocks after a <strong>saved win</strong> on night <strong>N−1</strong> (see <code>wins</code> in DB). Nights 3–7 also require login.</p>
+  <div class="grid" id="grid"></div>
+  <button class="launch" id="launch" type="button">Launch game</button>
+  <footer>
+    <a href="/auth">Register / login</a> (token in <code>localStorage.jwt</code> is sent on the game WebSocket so wins are saved.)
+    <span id="savedNights" class="muted" style="display:block;margin-top:0.5rem;"></span>
+  </footer>
+  <script>
+    let selected = 1;
+    const grid = document.getElementById("grid");
+    const launch = document.getElementById("launch");
+    function hasJwt() {
+      return !!(typeof localStorage !== "undefined" && localStorage.getItem("jwt"));
+    }
+    // Logged-in: completedNights null/undefined = still loading (lock n>=2). Else array from /api/me.
+    function applyNightLocks(completedNights) {
+      const loggedIn = hasJwt();
+      var won;
+      if (!loggedIn) {
+        won = [];
+      } else if (completedNights == null) {
+        won = null;
+      } else {
+        won = Array.isArray(completedNights) ? completedNights : [];
+      }
+      grid.querySelectorAll(".night").forEach((btn) => {
+        const n = +btn.dataset.n;
+        let locked = false;
+        let title = "";
+        if (n > 2 && !loggedIn) {
+          locked = true;
+          title = "Log in at /auth to unlock nights 3–7.";
+        } else if (loggedIn && n >= 2) {
+          if (won === null) {
+            locked = true;
+            title = "Loading your saved wins…";
+          } else if (!won.includes(n - 1)) {
+            locked = true;
+            title = "Win night " + (n - 1) + " while logged in first.";
+          }
+        }
+        btn.disabled = locked;
+        btn.title = title;
+      });
+      if (!loggedIn && selected > 2) selected = 2;
+      else {
+        while (selected > 1) {
+          const b = grid.querySelector('.night[data-n="' + selected + '"]');
+          if (b && !b.disabled) break;
+          selected--;
+        }
+      }
+      grid.querySelectorAll(".night").forEach((x) =>
+        x.classList.toggle("selected", +x.dataset.n === selected));
+    }
+    for (let n = 1; n <= 7; n++) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "night" + (n === 1 ? " selected" : "");
+      b.textContent = "Night " + n;
+      b.dataset.n = String(n);
+      b.addEventListener("click", () => {
+        if (b.disabled) return;
+        selected = n;
+        grid.querySelectorAll(".night").forEach((x) => x.classList.toggle("selected", +x.dataset.n === n));
+      });
+      grid.appendChild(b);
+    }
+    applyNightLocks();
+    launch.addEventListener("click", () => {
+      const b = grid.querySelector('.night[data-n="' + selected + '"]');
+      if (b && b.disabled) return;
+      window.location.href = "/game/game.html?night=" + encodeURIComponent(String(selected));
+    });
+
+    (async function loadSavedNights() {
+      var el = document.getElementById("savedNights");
+      var t = (typeof localStorage !== "undefined") ? localStorage.getItem("jwt") : "";
+      if (!t) {
+        el.textContent = "Log in on /auth to save wins to the database and unlock progression.";
+        applyNightLocks();
+        return;
+      }
+      try {
+        var r = await fetch("/api/me", { headers: { Authorization: "Bearer " + t } });
+        var j = await r.json().catch(function () { return {}; });
+        if (!r.ok) {
+          el.textContent = "";
+          applyNightLocks(null);
+          return;
+        }
+        var arr = j.completedNights;
+        applyNightLocks(Array.isArray(arr) ? arr : []);
+        if (Array.isArray(arr) && arr.length)
+          el.textContent = "Wins on record (nights): " + arr.join(", ");
+        else
+          el.textContent = "No wins yet — finish a night while logged in to unlock the next.";
+      } catch (e) {
+        el.textContent = "";
+        applyNightLocks(null);
+      }
+    })();
+  </script>
+</body>
+</html>

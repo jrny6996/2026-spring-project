@@ -5,7 +5,7 @@ This provides a base project template which builds with
 
 ## Usage
 
-To compile the example, use one of the following dependending on your build
+To compile the game, use one of the following dependending on your build
 target...
 
 ### Desktop

@@ -28,6 +28,8 @@ class GameState {
   bool is_lobby_host = false;
   bool gameStarted = false;
   int gameTime = 0;
+  /// Server lobby night (1–7), from `nightNum` in state JSON.
+  int night_num = 1;
   /// Last menu-related error (e.g. failed join); shown on welcome screen.
   std::string menu_error;
   /// True after clicking Create until the server responds (invite or error).

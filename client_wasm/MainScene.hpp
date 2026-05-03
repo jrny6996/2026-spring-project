@@ -9,6 +9,7 @@
 #include "Scene.hpp"
 #include "asset_preload.hpp"
 #include "camera_nav.hpp"
+#include "dev_flags.hpp"
 #include "mainscene/helpers/camera_control.hpp"
 #include "mainscene/helpers/frame.hpp"
 #include "mainscene/helpers/pbr_lights.hpp"
@@ -122,16 +123,20 @@ class MainScene : public Scene {
     SetMouseCursor(MOUSE_CURSOR_DEFAULT);
 
     static constexpr const char* kFreddyPath =
-        "assets/freddy_fazbear_from_fnaf_help_wanted.glb";
-    static constexpr const char* kBonniePath =
-        "assets/fnaf_1_bonnie_by_thudner.glb";
-    static constexpr const char* kChicaPath = "assets/chica.glb";
-    static constexpr const char* kFoxyPath = "assets/rynfox_fnaf_1_foxy_v6.glb";
+        "assets/replacements/fnaf_plus_freddy_v1.glb";
+    static constexpr const char* kBonniePath = "assets/replacements/bonnie.glb";
+    static constexpr const char* kChicaPath =
+        "assets/replacements/shattered_chica.glb";
+    static constexpr const char* kFoxyPath =
+        "assets/replacements/phantom_foxy.glb";
     static constexpr const char* kToyFreddyPath =
-        "assets/toy_freddy_v2_fixed.glb";
-    static constexpr const char* kToyBonniePath = "assets/toy_bonnie.glb";
-    static constexpr const char* kToyChicaPath = "assets/toy_chica.glb";
-    static constexpr const char* kToyFoxyPath = "assets/fnaf_mangle.glb";
+        "assets/replacements/toy-freddy.glb";
+    static constexpr const char* kToyBonniePath =
+        "assets/replacements/vintage_toy_bonnie.glb";
+    static constexpr const char* kToyChicaPath =
+        "assets/replacements/vhs_tape_chica.glb";
+    static constexpr const char* kToyFoxyPath =
+        "assets/replacements/mangle_-_fnaf_ar_special_delivery.glb";
     static constexpr const char* kMap1Path = "assets/fnaf_1_hw_map.glb";
     static constexpr const char* kMap2Path = "assets/fnaf_2_hw_map_updated.glb";
     static constexpr const char* kPbrVsPath = "assets/shaders/glsl100/pbr.vs";
@@ -183,8 +188,8 @@ class MainScene : public Scene {
         {this->chica, {0.068f, 0.068f, 0.068f}, {2.15f, 0.0f, 0.35f}},
         {this->foxy, {0.048f, 0.048f, 0.048f}, {0.0f, 0.0f, -0.95f}},
         {this->toy_freddy, {0.015f, 0.015f, 0.015f}, {0.0f, 0.0f, 0.35f}},
-        {this->toy_bonnie, {2.015f, 2.015f, 2.015f}, {0.15f, 0.0f, 0.35f}},
-        {this->toy_chica, {1.5f, 1.5f, 1.5f}, {0.15f, 0.0f, 0.35f}},
+        {this->toy_bonnie, {0.15f, 0.15f, 0.15f}, {0.15f, 0.0f, 0.35f}},
+        {this->toy_chica, {0.75f, 0.75f, 0.75f}, {0.5f, 0.0f, 0.35f}},
         {this->toy_foxy, {1.2f, 1.2f, 1.2f}, {0.0f, 0.0f, 0.6f}},
     };
     this->tronic_maps_ = create_tronic_positions(tronic_roster);
@@ -226,11 +231,12 @@ class MainScene : public Scene {
       camera_nav_.panel_open = false;
       camera_nav_.active_feed = -1;
     }
-    // F3 (not L — P2 uses L for music box)
-    if (IsKeyPressed(KEY_F3))
-      debug_tronic_coords_ = !debug_tronic_coords_;
-    if (state.gameStarted && IsKeyPressed(KEY_T))
-      ws::send_step(socket);
+    if constexpr (is_dev) {
+      if (IsKeyPressed(KEY_F3))
+        debug_tronic_coords_ = !debug_tronic_coords_;
+      if (state.gameStarted && IsKeyPressed(KEY_T))
+        ws::send_step(socket);
+    }
     if (state.gameStarted && !state.is_player_one && IsKeyPressed(KEY_E)) {
       p2_task_overlay_open_ = !p2_task_overlay_open_;
     }
@@ -274,28 +280,29 @@ class MainScene : public Scene {
     mainscene::clamp_and_apply_pbr_for_security_feed(
         state, camera_nav_, pbr_lights_, pbr_light_count_);
 
-    mainscene::apply_player_two_default_campos(state.is_player_one, is_freeroam,
-                                               camPos);
+    const bool freeroam_active = is_dev && is_freeroam;
+    mainscene::apply_player_two_default_campos(state.is_player_one,
+                                               freeroam_active, camPos);
 
-    if (is_freeroam) {
-      mainscene::apply_free_cam_move(camPos, yaw, is_freeroam);
+    if (freeroam_active) {
+      mainscene::apply_free_cam_move(camPos, yaw, freeroam_active);
     }
 
     ClearBackground(BLACK);
 
     mainscene::apply_security_feed_or_office_view(this->camera, camera_nav_,
                                                   state.is_player_one, camPos,
-                                                  yaw, pitch, is_freeroam);
+                                                  yaw, pitch, freeroam_active);
 
     mainscene::sync_pbr_shader_frame(map_shader, camera, pbr_lights_,
                                      pbr_light_count_, camPos);
     BeginDrawing();
     BeginMode3D(this->camera);
-    mainscene::draw_main_scene_3d(this->camera_nav_, state.is_player_one, state,
-                                  animatronic_models_.data(),
-                                  animatronic_models_.size(),
-                                  this->freddyInitialPos, this->tronic_maps_,
-                                  this->map, this->p_map, debug_tronic_coords_);
+    mainscene::draw_main_scene_3d(
+        this->camera_nav_, state.is_player_one, state,
+        animatronic_models_.data(), animatronic_models_.size(),
+        this->freddyInitialPos, this->tronic_maps_, this->map, this->p_map,
+        is_dev && debug_tronic_coords_);
     if (state.is_player_one) {
       this->draw_doors();
     } else if (state.p2_mask_down) {
@@ -303,13 +310,15 @@ class MainScene : public Scene {
     }
     EndMode3D();
     mainscene::draw_main_scene_2d(this->camera, camera_nav_, state,
-                                  debug_tronic_coords_, this->tronic_maps_,
-                                  this->freddyInitialPos, this->is_freeroam,
-                                  p2_task_overlay_open_);
+                                  is_dev && debug_tronic_coords_,
+                                  this->tronic_maps_, this->freddyInitialPos,
+                                  freeroam_active, p2_task_overlay_open_);
     EndDrawing();
   }
 
   void listen() override {
-    mainscene::on_freeroam_shortcut(camPos, yaw, pitch, is_freeroam);
+    if constexpr (is_dev) {
+      mainscene::on_freeroam_shortcut(camPos, yaw, pitch, is_freeroam);
+    }
   }
 };

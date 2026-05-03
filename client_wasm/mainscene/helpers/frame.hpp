@@ -5,6 +5,7 @@
 #include <map>
 #include <string>
 #include "../../GameState.hpp"
+#include "../../dev_flags.hpp"
 #include "../../camera_nav.hpp"
 #include "../../ws_init.hpp"
 #include "camera_control.hpp"
@@ -603,7 +604,7 @@ inline void draw_p2_task_overlay(const GameState& state, bool show_overlay) {
   const char* left_title = "GENERATE POWER";
   int tw = MeasureText(left_title, title_fs);
   DrawText(left_title, mid / 2 - tw / 2, sh / 5, title_fs, RAYWHITE);
-  const char* j_hint = "tap J (+ T tick)";
+  const char* j_hint = is_dev ? "tap J (+ T tick)" : "tap J";
   DrawText(j_hint, mid / 2 - MeasureText(j_hint, 18) / 2, sh / 5 + 30, 18,
            Fade(LIGHTGRAY, 0.92f));
 
@@ -611,7 +612,7 @@ inline void draw_p2_task_overlay(const GameState& state, bool show_overlay) {
   tw = MeasureText(right_title, title_fs);
   DrawText(right_title, mid + (sw - mid) / 2 - tw / 2, sh / 5, title_fs,
            RAYWHITE);
-  const char* l_hint = "tap L (+ T tick)";
+  const char* l_hint = is_dev ? "tap L (+ T tick)" : "tap L";
   DrawText(l_hint,
            mid + (sw - mid) / 2 - MeasureText(l_hint, 18) / 2, sh / 5 + 30, 18,
            Fade(LIGHTGRAY, 0.92f));
@@ -660,36 +661,46 @@ inline void draw_main_scene_2d(
     const Vector3& tronic_default_pos, bool is_freeroam,
     bool p2_task_overlay_visible) {
   camera_nav.DrawPanel(state.is_player_one);
-  char coord_text[64];
-  std::snprintf(coord_text, sizeof(coord_text), "x: %.2f",
-                static_cast<double>(camera.position.x));
-  DrawText(coord_text, 10, 10, 16, WHITE);
-  std::snprintf(coord_text, sizeof(coord_text), "y: %.2f",
-                static_cast<double>(camera.position.y));
-  DrawText(coord_text, 10, 28, 16, WHITE);
-  std::snprintf(coord_text, sizeof(coord_text), "z: %.2f",
-                static_cast<double>(camera.position.z));
-  DrawText(coord_text, 10, 46, 16, WHITE);
-  if (state.has_player_slot) {
-    const char* label = state.is_player_one ? "Player 1" : "Player 2";
-    DrawText(label, 10, 64, 16, WHITE);
+  if constexpr (is_dev) {
+    char coord_text[64];
+    std::snprintf(coord_text, sizeof(coord_text), "x: %.2f",
+                  static_cast<double>(camera.position.x));
+    DrawText(coord_text, 10, 10, 16, WHITE);
+    std::snprintf(coord_text, sizeof(coord_text), "y: %.2f",
+                  static_cast<double>(camera.position.y));
+    DrawText(coord_text, 10, 28, 16, WHITE);
+    std::snprintf(coord_text, sizeof(coord_text), "z: %.2f",
+                  static_cast<double>(camera.position.z));
+    DrawText(coord_text, 10, 46, 16, WHITE);
+    if (state.has_player_slot) {
+      const char* label = state.is_player_one ? "Player 1" : "Player 2";
+      DrawText(label, 10, 64, 16, WHITE);
+    }
   }
   if (state.gameStarted) {
     char pbuf[48];
     std::snprintf(pbuf, sizeof(pbuf), "Power: %d / 100", state.power);
     const int sw = GetScreenWidth();
     DrawText(pbuf, sw - 200, 10, 18, GOLD);
-    if (state.is_player_one) {
-      DrawText("SPACE: queue power (applied on T tick)", sw - 360, 32, 14,
-               Fade(SKYBLUE, 0.9f));
+    if constexpr (is_dev) {
+      if (state.is_player_one) {
+        DrawText("SPACE: queue power (applied on T tick)", sw - 360, 32, 14,
+                 Fade(SKYBLUE, 0.9f));
+      }
     }
   }
   if (!state.is_player_one) {
+    const int mask_y = is_dev ? 82 : 10;
     const char* mask_label = state.p2_mask_down ? "Mask: DOWN" : "Mask: UP";
     Color mask_color = state.p2_mask_down ? GREEN : ORANGE;
-    DrawText(mask_label, 10, 82, 16, mask_color);
-    if (state.gameStarted && !state.p2_mask_down) {
-      DrawText("E: tasks  |  tap J/L to queue  |  T = apply tick", 10, 100, 14,
+    DrawText(mask_label, 10, mask_y, 16, mask_color);
+    if constexpr (is_dev) {
+      if (state.gameStarted && !state.p2_mask_down) {
+        DrawText("E: tasks  |  tap J/L to queue  |  T = apply tick", 10, 100,
+                 14, Fade(SKYBLUE, 0.88f));
+      }
+    } else if (state.gameStarted && !state.p2_mask_down) {
+      DrawText("E: tasks  |  tap J / L", 10, mask_y + 22, 14,
                Fade(SKYBLUE, 0.88f));
     }
   }
@@ -720,12 +731,14 @@ inline void draw_main_scene_2d(
       line_y -= 18;
     }
   }
-  DrawText("Cam feed: C = entities in this cam room (after start)", 10, 118, 16,
-           Fade(LIGHTGRAY, 0.85f));
-  DrawText("T = game step (sim + power/music tick)", 10, 136, 14,
-           Fade(LIGHTGRAY, 0.75f));
-  DrawText("F3 = toggle tronic x,y,z (after start)", 10, 152, 14,
-           Fade(LIGHTGRAY, 0.75f));
+  if constexpr (is_dev) {
+    DrawText("Cam feed: C = entities in this cam room (after start)", 10, 118, 16,
+             Fade(LIGHTGRAY, 0.85f));
+    DrawText("T = game step (sim + power/music tick)", 10, 136, 14,
+             Fade(LIGHTGRAY, 0.75f));
+    DrawText("F3 = toggle tronic x,y,z (after start)", 10, 152, 14,
+             Fade(LIGHTGRAY, 0.75f));
+  }
   draw_p2_task_overlay(state, p2_task_overlay_visible);
 }
 

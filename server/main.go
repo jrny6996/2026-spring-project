@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"math/rand"
 	"net/http"
@@ -29,6 +30,10 @@ type UserWsConnection struct {
 	Remote  string
 	Conn    *websocket.Conn
 	WriteMu sync.Mutex
+	// NightNum from WebSocket URL ?night= (1–7); host value is copied into the lobby on start.
+	NightNum int16
+	// UserID from optional ?token= JWT (0 = guest); used to persist night wins in SQLite.
+	UserID int64
 }
 
 type Room struct {
@@ -37,6 +42,7 @@ type Room struct {
 }
 
 type GameRoomState struct {
+	// Time is cumulative in-game seconds for this night (advances gameSecondsPerTick per sim tick).
 	Time            int16      `json:"time"`
 	Started         bool       `json:"started"`
 	Host            string     `json:"host"`
@@ -50,6 +56,7 @@ type GameRoomState struct {
 	P2OfficeDanger  int        `json:"p2OfficeDanger"`
 	P1Lost          bool       `json:"-"`
 	P2Lost          bool       `json:"p2Lost"`
+	NightNum        int16      `json:"nightNum"`
 	Rooms           []Room     `json:"rooms"`
 	HostIsPlayerOne bool       `json:"-"`
 	Sim             *GameState `json:"-"`
@@ -101,7 +108,87 @@ type Message struct {
 	Data interface{} `json:"data"`
 }
 
-const NIGHT_IN_MINUTES = 99
+// nightLenInMinutes is the baseline night length in in-game minutes (see winTimeGameSeconds).
+const nightLenInMinutes = 6
+
+// gameSecondsPerTick is in-game seconds advanced each sim tick; keep equal to the real tick
+// interval in seconds so wall clock matches the night clock (night ends after nightLenInMinutes
+// of in-game time).
+const gameSecondsPerTick = 5
+
+// maxNightGuest is the highest night selectable without a logged-in WebSocket (?token= JWT).
+const maxNightGuest int16 = 2
+
+// clampNightProgressionLoggedIn lowers requested night until night 1 or previous night is in wins table.
+func clampNightProgressionLoggedIn(userID int64, requested int16) int16 {
+	n := clampNight(requested)
+	for n >= 2 {
+		ok, err := hasUserWonNight(userID, int(n)-1)
+		if err != nil {
+			log.Printf("hasUserWonNight user=%d: %v", userID, err)
+			return 1
+		}
+		if ok {
+			break
+		}
+		n--
+	}
+	return n
+}
+
+func clampNight(n int16) int16 {
+	if n < 1 {
+		return 1
+	}
+	if n > 7 {
+		return 7
+	}
+	return n
+}
+
+// parseNightQuery reads ?night= from the WebSocket handshake (1–7, default 1).
+func parseNightQuery(r *http.Request) int16 {
+	s := strings.TrimSpace(r.URL.Query().Get("night"))
+	if s == "" {
+		return 1
+	}
+	v, err := strconv.Atoi(s)
+	if err != nil || v < 1 {
+		return 1
+	}
+	if v > 7 {
+		return 7
+	}
+	return int16(v)
+}
+
+// parseWSUserID returns JWT user id from ?token= on the WebSocket URL, or 0 if missing/invalid.
+func parseWSUserID(r *http.Request) int64 {
+	tok := strings.TrimSpace(r.URL.Query().Get("token"))
+	if tok == "" {
+		return 0
+	}
+	claims, err := parseTokenString(tok)
+	if err != nil {
+		return 0
+	}
+	return claims.UserID
+}
+
+// winTimeGameSeconds returns in-game seconds survived to win (same unit as room.Time).
+// room.Time is cumulative in-game seconds; when it reaches this value, handleNightEnd runs.
+// Higher nights end sooner (demo curve); maps use NightNum in CreateInitialMap / CreateP2Map.
+func winTimeGameSeconds(night int16) int {
+	n := int(clampNight(night))
+	base := nightLenInMinutes * 60
+	// Shorter nights for higher night numbers (tunable with sim difficulty).
+	penalty := (n - 1) * (base / 7)
+	out := base - penalty
+	if out < base/4 {
+		return base / 4
+	}
+	return out
+}
 
 var connectedUsersSet = make(map[string]*UserWsConnection)
 var lobbySet = make(map[string]*GameRoomState)
@@ -131,6 +218,12 @@ func broadcastStateToLobby(lobbyID string) {
 }
 
 func handleNightEnd(lobbyID string) {
+	room, ok := lobbySet[lobbyID]
+	winNight := int(1)
+	if ok && room != nil {
+		winNight = int(clampNight(room.NightNum))
+	}
+
 	var batch []*UserWsConnection
 	for _, u := range connectedUsersSet {
 		if u == nil || u.LobbyID != lobbyID || u.Conn == nil {
@@ -144,6 +237,11 @@ func handleNightEnd(lobbyID string) {
 		_ = u.Conn.Close()
 		u.Conn = nil
 		u.WriteMu.Unlock()
+		if u.UserID > 0 {
+			if err := recordWin(u.UserID, winNight); err != nil {
+				log.Printf("lobby %s: record win night %d for user %d: %v", lobbyID, winNight, u.UserID, err)
+			}
+		}
 	}
 	cleanupLobby(lobbyID)
 }
@@ -261,9 +359,10 @@ func isPlayerTwoUser(room *GameRoomState, remote string) bool {
 	return false
 }
 
-// applyChargeEconomyTick runs generator + music box once per game step (manual step only).
-func applyChargeEconomyTick(room *GameRoomState) {
-	if room == nil {
+// applyChargeEconomyTick runs generator + music box once per sim tick; gameSeconds is how many
+// in-game seconds this tick represents (music wind decays by that much).
+func applyChargeEconomyTick(room *GameRoomState, gameSeconds int) {
+	if room == nil || gameSeconds <= 0 {
 		return
 	}
 	if room.p1PowerQueued > 0 {
@@ -288,35 +387,76 @@ func applyChargeEconomyTick(room *GameRoomState) {
 		room.p2MusicQueued = 0
 	}
 	if room.MusicBoxWind > 0 {
-		room.MusicBoxWind--
+		d := gameSeconds
+		if d > room.MusicBoxWind {
+			d = room.MusicBoxWind
+		}
+		room.MusicBoxWind -= d
 	}
 	if room.Power > 100 {
 		room.Power = 100
 	}
 }
 
-// runSimStepTicker advances night time and the sim for each started lobby
-// on a single shared interval (one tick every 10s; each lobby has its own room).
-func runSimStepTicker() {
-	ticker := time.NewTicker(10 * time.Second)
-	defer ticker.Stop()
-	for range ticker.C {
-		var toEnd []string
-		for lobbyID, room := range lobbySet {
-			if room == nil || !room.Started || room.Sim == nil {
-				continue
-			}
-			room.Time++
-			if false {
-				room.Sim.Step(lobbyID)
-			}
-			broadcastStateToLobby(lobbyID)
-			if int(room.Time) > NIGHT_IN_MINUTES*60 {
-				toEnd = append(toEnd, lobbyID)
+// advanceLobbySimOneTick advances room.Time, economy, and sim by one tick (gameSecondsPerTick
+// in-game seconds). Used by the periodic ticker and by manual "step" messages.
+func advanceLobbySimOneTick(lobbyID string) {
+	room, exists := lobbySet[lobbyID]
+	if !exists || room == nil || !room.Started || room.Sim == nil {
+		return
+	}
+
+	room.Time += int16(gameSecondsPerTick)
+	if room.LHSDoorDown {
+		room.Power -= gameSecondsPerTick
+	}
+	if room.RHSDoorDown {
+		room.Power -= gameSecondsPerTick
+	}
+	applyChargeEconomyTick(room, gameSecondsPerTick)
+	if room.Power <= 0 {
+		handleLobbyLose(lobbyID, "power_out")
+		return
+	}
+	room.Sim.Step(lobbyID)
+	if room.Sim.AnyEntityInRoom("player_one_office") {
+		killer, _ := room.Sim.FirstEntityNameInRoom("player_one_office")
+		handlePlayerOneLose(lobbyID, killer)
+	}
+	if room.Sim.AnyEntityInRoom("player_two_office") {
+		if room.P2MaskDown {
+			room.P2OfficeDanger = 0
+			room.Sim.MoveEntitiesBackFromRoom("player_two_office")
+		} else {
+			room.P2OfficeDanger++
+			if room.P2OfficeDanger >= 2 {
+				killer, _ := room.Sim.FirstEntityNameInRoom("player_two_office")
+				handlePlayerTwoLose(lobbyID, killer)
+				room.P2OfficeDanger = 0
+				room.Sim.MoveEntitiesBackFromRoom("player_two_office")
 			}
 		}
-		for _, id := range toEnd {
-			handleNightEnd(id)
+	} else {
+		room.P2OfficeDanger = 0
+	}
+	broadcastStateToLobby(lobbyID)
+
+	if int(room.Time) >= winTimeGameSeconds(room.NightNum) {
+		handleNightEnd(lobbyID)
+	}
+}
+
+// runSimStepTicker runs one full sim tick for every started lobby on a fixed interval.
+func runSimStepTicker() {
+	ticker := time.NewTicker(gameSecondsPerTick * time.Second)
+	defer ticker.Stop()
+	for range ticker.C {
+		ids := make([]string, 0, len(lobbySet))
+		for id := range lobbySet {
+			ids = append(ids, id)
+		}
+		for _, lobbyID := range ids {
+			advanceLobbySimOneTick(lobbyID)
 		}
 	}
 }
@@ -330,12 +470,14 @@ func main() {
 	}
 	defer db.Close()
 
-	tmpl := template.Must(template.ParseFiles("index.html"))
 	authTmpl := template.Must(template.ParseFiles("auth.html"))
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		tmpl.Execute(w, nil)
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = io.WriteString(w, playPageHTML)
 	})
+
+	http.Handle("/game/", http.StripPrefix("/game/", http.FileServer(http.FS(wasmGameSubFS()))))
 
 	http.HandleFunc("/auth", func(w http.ResponseWriter, r *http.Request) {
 		authTmpl.Execute(w, nil)
@@ -354,10 +496,17 @@ func main() {
 
 		addr := r.RemoteAddr
 		if _, exists := connectedUsersSet[addr]; !exists {
-			connectedUsersSet[addr] = &UserWsConnection{Remote: addr}
+			connectedUsersSet[addr] = &UserWsConnection{Remote: addr, NightNum: 1}
 		}
 		user := connectedUsersSet[addr]
 		user.Conn = conn
+		user.NightNum = parseNightQuery(r)
+		user.UserID = parseWSUserID(r)
+		if user.UserID == 0 && user.NightNum > maxNightGuest {
+			user.NightNum = maxNightGuest
+		} else if user.UserID > 0 {
+			user.NightNum = clampNightProgressionLoggedIn(user.UserID, user.NightNum)
+		}
 
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -453,7 +602,8 @@ func newGameRoomState(host string) GameRoomState {
 				IsObscured: false,
 			},
 		},
-		Sim: nil,
+		NightNum: 1,
+		Sim:      nil,
 	}
 }
 
@@ -545,10 +695,27 @@ func handleStartGame(conn *websocket.Conn, r *http.Request) {
 		return
 	}
 
+	wantNight := clampNight(user.NightNum)
+	if wantNight > maxNightGuest && user.UserID <= 0 {
+		writeJSONToUser(user, "error", "Log in at /auth (game needs your JWT on the WebSocket) to play nights 3–7.")
+		return
+	}
+	if user.UserID > 0 && wantNight >= 2 {
+		prevOK, err := hasUserWonNight(user.UserID, int(wantNight)-1)
+		if err != nil {
+			writeJSONToUser(user, "error", "Could not verify night progression; try again.")
+			return
+		}
+		if !prevOK {
+			writeJSONToUser(user, "error", "Win the previous night while logged in (saved in your profile) before starting this night.")
+			return
+		}
+	}
+
 	room.HostIsPlayerOne = rand.Intn(2) == 1
 	room.Started = true
 	room.Power = 30
-	room.MusicBoxWind = 0
+	room.MusicBoxWind = 100
 	room.LHSDoorDown = false
 	room.RHSDoorDown = false
 	room.P2MaskDown = false
@@ -558,10 +725,17 @@ func handleStartGame(conn *websocket.Conn, r *http.Request) {
 	room.p1PowerQueued = 0
 	room.p2PowerQueued = 0
 	room.p2MusicQueued = 0
-	room.Sim = NewGameState()
+	room.NightNum = wantNight
+	room.Sim = NewGameState(room.NightNum)
 	room.Sim.SpawnEntities()
-	log.Printf("lobby %s: SpawnEntities done, sim ready", user.LobbyID)
-	writeJSONToUser(user, "state", stateForClient(room, r.RemoteAddr, user.LobbyID))
+	log.Printf("lobby %s: SpawnEntities done, sim ready night=%d winAtGameSec=%d", user.LobbyID, room.NightNum, winTimeGameSeconds(room.NightNum))
+	lid := user.LobbyID
+	for _, u := range connectedUsersSet {
+		if u == nil || u.LobbyID != lid || u.Conn == nil {
+			continue
+		}
+		writeJSONToUser(u, "state", stateForClient(room, u.Remote, lid))
+	}
 }
 
 func handleStepGame(conn *websocket.Conn, r *http.Request) {
@@ -578,49 +752,7 @@ func handleStepGame(conn *websocket.Conn, r *http.Request) {
 		writeJSONToUser(user, "error", "game-not-started")
 		return
 	}
-
-	room.Time++
-	if room.LHSDoorDown {
-		room.Power--
-	}
-	if room.RHSDoorDown {
-		room.Power--
-	}
-	applyChargeEconomyTick(room)
-	if room.Power <= 0 {
-		handleLobbyLose(user.LobbyID, "power_out")
-		return
-	}
-	room.Sim.Step(user.LobbyID)
-	if room.Sim.AnyEntityInRoom("player_one_office") {
-		killer, _ := room.Sim.FirstEntityNameInRoom("player_one_office")
-		handlePlayerOneLose(user.LobbyID, killer)
-	}
-	if room.Sim.AnyEntityInRoom("player_two_office") {
-		if room.P2MaskDown {
-			// Masked P2 immediately repels office intruders.
-			room.P2OfficeDanger = 0
-			room.Sim.MoveEntitiesBackFromRoom("player_two_office")
-		} else {
-			// Require sustained unmasked office danger before P2 loses.
-			// This absorbs one-tick ordering jitter between "mask down" input
-			// and step processing so P2 doesn't die on a transient race.
-			room.P2OfficeDanger++
-			if room.P2OfficeDanger >= 2 {
-				killer, _ := room.Sim.FirstEntityNameInRoom("player_two_office")
-				handlePlayerTwoLose(user.LobbyID, killer)
-				room.P2OfficeDanger = 0
-				room.Sim.MoveEntitiesBackFromRoom("player_two_office")
-			}
-		}
-	} else {
-		room.P2OfficeDanger = 0
-	}
-	broadcastStateToLobby(user.LobbyID)
-
-	if int(room.Time) > NIGHT_IN_MINUTES*60 {
-		handleNightEnd(user.LobbyID)
-	}
+	advanceLobbySimOneTick(user.LobbyID)
 }
 
 func handleActionGame(conn *websocket.Conn, r *http.Request, content string) {

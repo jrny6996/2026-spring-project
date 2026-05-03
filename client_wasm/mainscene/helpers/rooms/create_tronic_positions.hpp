@@ -123,6 +123,7 @@ inline TronicPositionMap make_tronic_layout(const Model& model) {
        {"p2_rhs_party_two", {{10.0f, 50.0f, -9.0f}, {0, 1, 0}, 0.0f}},
 
        {"p2_middle_hall_two", {{0.0f, 50.0f, -25.0f}, {0, 1, 0}, 0.0f}},
+       {"p2_middle_hall_one", {{0.0f, 50.0f, -22.0f}, {0, 1, 0}, 0.0f}},
        {"p2_hallway_far_before_office",
         {{1.0f, 50.0f, -25.5f}, {0, 1, 0}, 0.0f}},
        {"p2_hallway_close_before_office",
@@ -166,6 +167,30 @@ inline std::map<std::string, TronicPositionMap> create_tronic_positions(
   auto& chica_party = chica_pos.at("party_room");
   chica_party = {-10.0f, 2.5f, -21.0f};
   chica_rhs.position = {2.8f, 2.5f, -8.0f};
+
+  // 2F halls and toy stage share one anchor per slot; nudge each toy mesh so they don't stack
+  // when several share p2_toy_stage or the same hall node.
+  auto nudge_p2_shared_slots = [](TronicPositionMap& m, float dx, float dz) {
+    static constexpr const char* kKeys[] = {
+        "p2_hallway_close_before_office",
+        "p2_hallway_far_before_office",
+        "p2_middle_hall_two",
+        "p2_middle_hall_one",
+        "p2_toy_stage",
+    };
+    for (const char* key : kKeys) {
+      auto it = m.pos_map.find(key);
+      if (it == m.pos_map.end())
+        continue;
+      it->second.position.x += dx;
+      it->second.position.z += dz;
+    }
+  };
+  constexpr float k2fHallSpread = 0.9f;
+  nudge_p2_shared_slots(out.at("toy_freddy"), -1.5f * k2fHallSpread, 0.0f);
+  nudge_p2_shared_slots(out.at("toy_bonnie"), -0.5f * k2fHallSpread, 0.0f);
+  nudge_p2_shared_slots(out.at("toy_chica"), 0.5f * k2fHallSpread, 0.0f);
+  nudge_p2_shared_slots(out.at("toy_foxy"), 1.5f * k2fHallSpread, 0.0f);
 
   return out;
 }

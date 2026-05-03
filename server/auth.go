@@ -193,8 +193,14 @@ func meHandler(w http.ResponseWriter, r *http.Request) {
 		respondJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 		return
 	}
+	nights, err := listCompletedNights(claims.UserID)
+	if err != nil {
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "database error"})
+		return
+	}
 	respondJSON(w, http.StatusOK, map[string]interface{}{
-		"id":       claims.UserID,
-		"username": claims.Username,
+		"id":              claims.UserID,
+		"username":        claims.Username,
+		"completedNights": nights,
 	})
 }

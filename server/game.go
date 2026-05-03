@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"math/rand"
 )
 
 // --- Entity and Graph Definitions ---
@@ -152,6 +153,8 @@ func isSingleOccupancyChoke(alias string) bool {
 
 // --- Game Graph Creation ---
 func CreateInitialMap(NightNum int16) *GameGraphNode {
+	NightNum = clampNightNum(NightNum)
+	_ = NightNum // graph tuning hook per night (routes / aggression TBD)
 	p1_office := &GameGraphNode{RoomID: 100, AliasName: "player_one_office"}
 
 	lhs_door := &GameGraphNode{RoomID: 5, AliasName: "lhs_door", IsBlocked: false}
@@ -184,6 +187,8 @@ func CreateInitialMap(NightNum int16) *GameGraphNode {
 }
 
 func CreateP2Map(NightNum int16) *GameGraphNode {
+	NightNum = clampNightNum(NightNum)
+	_ = NightNum // P2 graph tuning hook per night
 	p2_office := &GameGraphNode{RoomID: 100, AliasName: "player_two_office"}
 
 	lhs_vent := &GameGraphNode{RoomID: 100, AliasName: "lhs_vent"}
@@ -235,6 +240,16 @@ func CreateP2Map(NightNum int16) *GameGraphNode {
 	return facade_stage
 }
 
+func clampNightNum(n int16) int16 {
+	if n < 1 {
+		return 1
+	}
+	if n > 7 {
+		return 7
+	}
+	return n
+}
+
 // --- Helpers ---
 func FindNodeByAlias(start *GameGraphNode, alias string) *GameGraphNode {
 	visited := make(map[*GameGraphNode]bool)
@@ -260,12 +275,59 @@ func FindNodeByAlias(start *GameGraphNode, alias string) *GameGraphNode {
 // --- Game State Struct ---
 type GameState struct {
 	Time     int16
+	NightNum int16
 	P1Graph  *GameGraphNode
 	P2Graph  *GameGraphNode
 	Tracker  *EntityTracker
 	LHSDoor  *GameGraphNode
 	RHSDoor  *GameGraphNode
 	P2Office *GameGraphNode
+}
+
+const moveChanceDenominator = 20
+
+// moveChanceNumerator returns x in [0, 20]. Each game step, this entity moves with probability x/20.
+// Night 7: x == 20 (always) for entities that are allowed to move at all.
+// Foxy (id 4) and toy_foxy (id 14): x == 0 on night 1; active from night 2+.
+func moveChanceNumerator(entityID int16, night int16) int {
+	nn := int(clampNightNum(night))
+	switch entityID {
+	case 4, 14: // foxy, toy_foxy
+		if nn < 2 {
+			return 0
+		}
+	}
+	if nn >= 7 {
+		return moveChanceDenominator
+	}
+	n := nn
+	switch entityID {
+	case 1: // freddy
+		return minInt(19, 2+n*3)
+	case 2: // bonnie
+		return minInt(19, 3+n*3)
+	case 3: // chica
+		return minInt(19, 3+n*2)
+	case 4: // foxy (n >= 2)
+		return minInt(19, 4+(n-2)*4)
+	case 11: // toy_freddy
+		return minInt(19, 2+n*2)
+	case 12: // toy_bonnie
+		return minInt(19, 2+n*3)
+	case 13: // toy_chica
+		return minInt(19, 3+n*2)
+	case 14: // toy_foxy (n >= 2)
+		return minInt(19, 3+(n-2)*3)
+	default:
+		return minInt(19, 5+n*2)
+	}
+}
+
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 func (gs *GameState) SpawnEntities() {
@@ -296,9 +358,10 @@ func (gs *GameState) SpawnEntities() {
 	gs.Tracker.AddEntity(toy_chica, toy_stage)
 	gs.Tracker.AddEntity(toy_foxy, toy_stage)
 }
-func NewGameState() *GameState {
-	p1 := CreateInitialMap(1)
-	p2 := CreateP2Map(1)
+func NewGameState(nightNum int16) *GameState {
+	nightNum = clampNightNum(nightNum)
+	p1 := CreateInitialMap(nightNum)
+	p2 := CreateP2Map(nightNum)
 
 	// Linking maps
 	p1_lhs := FindNodeByAlias(p1, "lhs_door")
@@ -322,6 +385,8 @@ func NewGameState() *GameState {
 	tracker := NewEntityTracker()
 
 	return &GameState{
+		Time:     0,
+		NightNum: nightNum,
 		P1Graph:  p1,
 		P2Graph:  p2,
 		Tracker:  tracker,
@@ -357,6 +422,14 @@ func (gs *GameState) Step(lobbyID string) {
 			}
 		}
 		if found {
+			x := moveChanceNumerator(id, gs.NightNum)
+			if x <= 0 {
+				continue
+			}
+			// P(move) = x / moveChanceDenominator
+			if rand.Intn(moveChanceDenominator) >= x {
+				continue
+			}
 			gs.Tracker.MoveEntity(current)
 		}
 	}
@@ -543,7 +616,7 @@ func (gs *GameState) MoveEntitiesBackFromRoom(alias string) {
 }
 
 func main1() {
-	var game = NewGameState()
+	var game = NewGameState(1)
 	game.SpawnEntities()
 	game.Step("dev")
 	game.Step("dev")

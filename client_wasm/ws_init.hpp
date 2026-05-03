@@ -240,6 +240,14 @@ inline EM_BOOL on_message(int, const EmscriptenWebSocketMessageEvent* e,
             state->sim_entities.clear();
           if (data.contains("time"))
             state->gameTime = data.value("time", 0);
+          if (data.contains("nightNum")) {
+            int nn = data.value("nightNum", 1);
+            if (nn < 1)
+              nn = 1;
+            if (nn > 7)
+              nn = 7;
+            state->night_num = nn;
+          }
           if (data.contains("isPlayerOne")) {
             state->has_player_slot = true;
             state->is_player_one = data.value("isPlayerOne", false);

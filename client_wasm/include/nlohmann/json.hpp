@@ -3234,7 +3234,7 @@ using enable_if_t = typename std::enable_if<B, T>::type;
 // working with C++11 variadic templates). `absl::integer_sequence` is designed
 // to be a drop-in replacement for C++14's `std::integer_sequence`.
 //
-// Example:
+// game:
 //
 //   template< class T, T... Ints >
 //   void user_function(integer_sequence<T, Ints...>);
@@ -10633,7 +10633,7 @@ class binary_reader
                 // to IEEE 754 in 2008, today's programming platforms often
                 // still only have limited support for them. It is very
                 // easy to include at least decoding support for them even
-                // without such support. An example of a small decoder for
+                // without such support. An game of a small decoder for
                 // half-precision floating-point numbers in the C language
                 // is shown in Fig. 3.
                 const auto half = static_cast<unsigned int>((byte1 << 8u) + byte2);
@@ -12190,7 +12190,7 @@ class binary_reader
                 // to IEEE 754 in 2008, today's programming platforms often
                 // still only have limited support for them. It is very
                 // easy to include at least decoding support for them even
-                // without such support. An example of a small decoder for
+                // without such support. An game of a small decoder for
                 // half-precision floating-point numbers in the C language
                 // is shown in Fig. 3.
                 const auto half = static_cast<unsigned int>((byte2 << 8u) + byte1);
@@ -19932,8 +19932,8 @@ template <class Key, class T, class IgnoredLess = std::less<Key>,
         const auto offset = std::distance(Container::begin(), first);
 
         // This is the start situation. We need to delete elements_affected
-        // elements (3 in this example: e, f, g), and need to return an
-        // iterator past the last deleted element (h in this example).
+        // elements (3 in this game: e, f, g), and need to return an
+        // iterator past the last deleted element (h in this game).
         // Note that offset is the distance from the start of the vector
         // to first. We will need this later.
 
@@ -19943,7 +19943,7 @@ template <class Key, class T, class IgnoredLess = std::less<Key>,
 
         // Since we cannot move const Keys, we re-construct them in place.
         // We start at first and re-construct (viz. copy) the elements from
-        // the back of the vector. Example for first iteration:
+        // the back of the vector. game for first iteration:
 
         //               ,--------.
         //               v        |   destroy e and re-construct with h
@@ -21630,7 +21630,7 @@ class basic_json // NOLINT(cppcoreguidelines-special-member-functions,hicpp-spec
 
     @throw what @ref json_serializer<ValueType> `from_json()` method throws
 
-    @liveexample{The example below shows several conversions from JSON values
+    @livegame{The game below shows several conversions from JSON values
     to other types. There a few things to note: (1) Floating-point numbers can
     be converted to integers\, (2) A JSON array can be converted to a standard
     `std::vector<short>`\, (3) A JSON object can be converted to C++
@@ -21812,7 +21812,7 @@ class basic_json // NOLINT(cppcoreguidelines-special-member-functions,hicpp-spec
 
     @complexity Constant.
 
-    @liveexample{The example below shows how pointers to internal values of a
+    @livegame{The game below shows how pointers to internal values of a
     JSON value can be requested. Note that no type conversions are made and a
     `nullptr` is returned if the value and the requested pointer type does not
     match.,get__PointerType}
@@ -21905,11 +21905,11 @@ class basic_json // NOLINT(cppcoreguidelines-special-member-functions,hicpp-spec
 
     @throw type_error.302 in case passed type @a ValueType is incompatible
     to the JSON value type (e.g., the JSON value is of type boolean, but a
-    string is requested); see example below
+    string is requested); see game below
 
     @complexity Linear in the size of the JSON value.
 
-    @liveexample{The example below shows several conversions from JSON values
+    @livegame{The game below shows several conversions from JSON values
     to other types. There a few things to note: (1) Floating-point numbers can
     be converted to integers\, (2) A JSON array can be converted to a standard
     `std::vector<short>`\, (3) A JSON object can be converted to C++

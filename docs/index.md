@@ -6,10 +6,13 @@ nav_order: 1
 
 This site documents the **2026 Spring Project**: a cooperative night-survival game with a **Go** authoritative server, **raylib** graphics, and a **WebAssembly** client (Emscripten). Gameplay state, animatronic movement, power, and win/lose rules run on the server; the browser renders 3D and sends player actions over WebSockets.
 
+The project is also framed as an **MIS Independent Study**; the formal proposal (summary, scope, learning objectives, deliverables) lives on [Independent study]({{ site.baseurl }}/independent-study/).
+
 ## Sections
 
 | Topic | What you will find |
 |--------|---------------------|
+| [Independent study]({{ site.baseurl }}/independent-study/) | MIS proposal: scope, learning goals, deliverables, mapping to this repo |
 | [Build]({{ site.baseurl }}/build/) | Local dev, WASM build, Docker, syncing artifacts into the server |
 | [Server]({{ site.baseurl }}/server/) | HTTP routes, WebSocket protocol, sim ticker, auth, persistence |
 | [Client]({{ site.baseurl }}/client/) | raylib + Emscripten, header-only style, WebSocket helpers |

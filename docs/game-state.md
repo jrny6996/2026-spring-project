@@ -2,7 +2,7 @@
 layout: page
 title: Game state
 permalink: /game-state/
-nav_order: 5
+nav_order: 6
 ---
 
 ## Two “game states” (by design)

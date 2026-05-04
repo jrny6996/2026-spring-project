@@ -2,7 +2,7 @@
 layout: page
 title: Economy
 permalink: /economy/
-nav_order: 6
+nav_order: 7
 ---
 
 ## Design goal

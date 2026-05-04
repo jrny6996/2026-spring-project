@@ -2,7 +2,7 @@
 layout: page
 title: Scene swapping
 permalink: /scene-swapping/
-nav_order: 7
+nav_order: 8
 ---
 
 ## Pattern

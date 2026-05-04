@@ -19,6 +19,8 @@ Other platforms: [doxygen.nl/download](https://www.doxygen.nl/download.html) or 
 
 Open **`doxygen-html/index.html`**. Output is listed in `.gitignore`; CI copies it to GitHub Pages under **`/docs/cpp/`** on deploy.
 
+HTML uses **[Doxygen Awesome](https://jothepro.github.io/doxygen-awesome-css/)** (vendored under `doxygen-awesome-css/`).
+
 ## Usage
 
 To compile the game, use one of the following dependending on your build

@@ -1,3 +1,5 @@
+# Local URL: http://localhost:6789 — bare http://fnaf-app:6789/ fails unless /etc/hosts has
+# "127.0.0.1 fnaf-app". Or use http://fnaf-app.localhost:6789/ (resolves on macOS without hosts).
 services:
   app:
     build:
@@ -11,8 +13,14 @@ services:
       DATABASE_PATH: ${DATABASE_PATH:-/data/app.db}
     volumes:
       - sqlite-data:/data
+    ports:
+      - "6789:6789"
     expose:
       - "6789"
+    networks:
+      default:
+        aliases:
+          - fnaf-app
 
   tunnel:
     container_name: cloudflared-tunnel

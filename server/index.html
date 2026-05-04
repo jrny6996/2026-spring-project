@@ -20,10 +20,9 @@
             const joinLobby = document.getElementById("join");
             const output = document.getElementById("output");
 
-            // Connect to WebSocket
-            const socket = new WebSocket(
-                "ws://localhost:6789/echo",
-            );
+            const wsURL = (location.protocol === "https:" ? "wss:" : "ws:") + "//" +
+                location.host + "/echo";
+            const socket = new WebSocket(wsURL);
 
             // Connection opened
             socket.onopen = () => {

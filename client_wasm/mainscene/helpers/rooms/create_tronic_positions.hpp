@@ -194,3 +194,44 @@ inline std::map<std::string, TronicPositionMap> create_tronic_positions(
 
   return out;
 }
+
+/// Permanent world offset for one animatronic (`tronic_key`) at one layout `room_key`
+/// (e.g. `"chica"`, `"party_room"`). Keys match `tronic_key_from_sim_entity` /
+/// `tronic_3d_pos_key` (e.g. `"p2_toy_stage"` on 2F). Returns false if the tronic or
+/// room slot is missing.
+inline bool offset_tronic_at_room(
+    std::map<std::string, TronicPositionMap>& tronic_by_entity,
+    const std::string& tronic_key, const std::string& room_key, Vector3 delta) {
+  auto it = tronic_by_entity.find(tronic_key);
+  if (it == tronic_by_entity.end())
+    return false;
+  return it->second.offset_room_position(room_key, delta);
+}
+
+/// Adds `delta` to `layout_offset` for `tronic_key` so every room uses the same nudge
+/// at resolve/draw time (preferred over mutating each `pos_map` entry).
+inline bool add_tronic_layout_offset(std::map<std::string, TronicPositionMap>& maps,
+                                     const std::string& tronic_key, Vector3 delta) {
+  auto it = maps.find(tronic_key);
+  if (it == maps.end())
+    return false;
+  it->second.add_layout_offset(delta);
+  return true;
+}
+
+/// @deprecated Prefer `add_tronic_layout_offset` (same effect for all rooms).
+inline bool offset_tronic_all_rooms(std::map<std::string, TronicPositionMap>& maps,
+                                    const std::string& tronic_key, Vector3 delta) {
+  return add_tronic_layout_offset(maps, tronic_key, delta);
+}
+
+/// Adds to `character_offset` for one tronic (stage / toy_stage placement nudge).
+inline bool add_tronic_character_offset(std::map<std::string, TronicPositionMap>& maps,
+                                        const std::string& tronic_key,
+                                        Vector3 delta) {
+  auto it = maps.find(tronic_key);
+  if (it == maps.end())
+    return false;
+  it->second.add_character_offset(delta);
+  return true;
+}

@@ -50,8 +50,11 @@ class MainScene : public Scene {
   bool right_door_closed_ = false;
   float left_door_y_ = 6.5f;
   float right_door_y_ = 6.5f;
-  /// P2 full-screen generator/music UI (E); off by default so the office is visible.
+  /// P2: E in office arms tasks; then left-mouse hold on L/R half queues power/music.
+  bool p2_e_tasks_armed_ = false;
   bool p2_task_overlay_open_ = false;
+  float p2_mouse_hold_power_acc_ = 0.0f;
+  float p2_mouse_hold_music_acc_ = 0.0f;
 
   static constexpr float kDoorYDown = 2.5f;
   static constexpr float kDoorYUp = 6.5f;
@@ -184,17 +187,19 @@ class MainScene : public Scene {
     enable_pbr();
     const TronicRosterSpec tronic_roster{
         {this->freddy, {0.5f, 0.5f, 0.5f}, {1.0f, 0.0f, 1.0f}},
-        {this->bonnie, {0.0045f, 0.0045f, 0.0045f}, {0.0f, 0.0f, 0.0f}},
+        {this->bonnie, {0.0045f, 0.0045f, 0.0045f}, {0.0f, 2.0f, 0.0f}},
         {this->chica, {0.068f, 0.068f, 0.068f}, {2.15f, 0.0f, 0.35f}},
-        {this->foxy, {0.48f, 0.48f, 0.48f}, {0.0f, 0.0f, 0.0f}},
-        {this->toy_freddy, {1.15f, 1.15f, 1.15f}, {0.0f, 0.0f, 0.0f}},
-        {this->toy_bonnie, {0.25f, 0.25f, 0.25f}, {0.0f, 0.0f, 0.0f}},
-        {this->toy_chica, {0.75f, 0.75f, 0.75f}, {0.0f, 0.0f, 0.0f}},
-        {this->toy_foxy, {1.2f, 1.2f, 1.2f},{0.0f, 0.0f, 0.0f}},
+        {this->foxy, {0.2f, 0.2f, 0.2f}, {0.0f, 0.0f, 0.0f}},
+        {this->toy_freddy, {0.45f, 0.45f, 0.45f}, {0.0f, 0.0f, 0.0f}},
+        {this->toy_bonnie, {0.25f, 0.25f, 0.25f}, {0.0f, 2.0f, 0.0f}},
+        {this->toy_chica, {0.85f, 0.85f, 0.85f}, {0.0f, 0.0f, 0.0f}},
+        {this->toy_foxy, {1.8f, 1.8f, 1.8f},{0.0f, 0.0f, 0.0f}},
     };
     this->tronic_maps_ = create_tronic_positions(tronic_roster);
     animatronic_models_ = {&this->freddy, &this->bonnie, &this->chica,
                            &this->foxy};
+                add_tronic_layout_offset(tronic_maps_, "toy_bonnie", {0.0f, 2.0f, 0.0f});  
+                  
     this->camera.fovy = 50.0f;
     this->camera.target.x = -1.0f;
     this->camera.target.z = 10.0f;
@@ -237,14 +242,14 @@ class MainScene : public Scene {
       if (state.gameStarted && IsKeyPressed(KEY_T))
         ws::send_step(socket);
     }
-    if (state.gameStarted && !state.is_player_one && IsKeyPressed(KEY_E)) {
-      p2_task_overlay_open_ = !p2_task_overlay_open_;
-    }
     if (state.gameStarted && !state.is_player_one && IsKeyPressed(KEY_Q)) {
       state.p2_mask_down = !state.p2_mask_down;
       ws::send_mask_state(socket, state.p2_mask_down);
       if (state.p2_mask_down) {
+        p2_e_tasks_armed_ = false;
         p2_task_overlay_open_ = false;
+        p2_mouse_hold_power_acc_ = 0.0f;
+        p2_mouse_hold_music_acc_ = 0.0f;
         camera_nav_.panel_open = false;
         camera_nav_.active_feed = -1;
       }
@@ -255,13 +260,52 @@ class MainScene : public Scene {
         ws::send_p1_power_queued(socket, 1);
       }
       if (!state.is_player_one && !state.p2_mask_down) {
-        if (IsKeyPressed(KEY_J))
-          ws::send_p2_power_queued(socket, 1);
-        if (IsKeyPressed(KEY_L))
-          ws::send_p2_music_queued(socket, 1);
+        constexpr float kHoldSendInterval = 0.12f;
+        const bool office_view =
+            camera_nav_.active_feed < 0 && !camera_nav_.panel_open;
+        // E toggles task mode (office only); mouse only queues while armed.
+        if (IsKeyPressed(KEY_E) && office_view)
+          p2_e_tasks_armed_ = !p2_e_tasks_armed_;
+
+        p2_task_overlay_open_ = p2_e_tasks_armed_ && office_view;
+
+        if (p2_e_tasks_armed_ && office_view &&
+            IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+          const int mx = GetMouseX();
+          const int sw = GetScreenWidth();
+          const int mid = sw / 2;
+          const float dt = GetFrameTime();
+          if (mx < mid) {
+            p2_mouse_hold_music_acc_ = 0.0f;
+            p2_mouse_hold_power_acc_ += dt;
+            while (p2_mouse_hold_power_acc_ >= kHoldSendInterval) {
+              p2_mouse_hold_power_acc_ -= kHoldSendInterval;
+              ws::send_p2_power_queued(socket, 1);
+            }
+          } else {
+            p2_mouse_hold_power_acc_ = 0.0f;
+            p2_mouse_hold_music_acc_ += dt;
+            while (p2_mouse_hold_music_acc_ >= kHoldSendInterval) {
+              p2_mouse_hold_music_acc_ -= kHoldSendInterval;
+              ws::send_p2_music_queued(socket, 1);
+            }
+          }
+        } else {
+          p2_mouse_hold_power_acc_ = 0.0f;
+          p2_mouse_hold_music_acc_ = 0.0f;
+        }
+        if constexpr (is_dev) {
+          if (IsKeyPressed(KEY_J))
+            ws::send_p2_power_queued(socket, 1);
+          if (IsKeyPressed(KEY_L))
+            ws::send_p2_music_queued(socket, 1);
+        }
       }
     } else {
+      p2_e_tasks_armed_ = false;
       p2_task_overlay_open_ = false;
+      p2_mouse_hold_power_acc_ = 0.0f;
+      p2_mouse_hold_music_acc_ = 0.0f;
     }
     if (state.gameStarted && state.is_player_one) {
       const bool prev_left = left_door_closed_;

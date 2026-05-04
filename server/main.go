@@ -18,6 +18,21 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// nightLenInMinutes is the baseline night length in in-game minutes (see winTimeGameSeconds).
+const nightLenInMinutes = 1
+
+// gameSecondsPerTick is in-game seconds advanced each sim tick; keep equal to the real tick
+// interval in seconds so wall clock matches the night clock (night ends after nightLenInMinutes
+// of in-game time).
+const gameSecondsPerTick = 5
+
+// powerDrainPerClosedDoorPerTick is how much shared power drops per sim tick per closed door.
+// (Previously this used gameSecondsPerTick, which made a single door cost 5/tick.)
+const powerDrainPerClosedDoorPerTick = 1
+
+// maxNightGuest is the highest night selectable without a logged-in WebSocket (?token= JWT).
+const maxNightGuest int16 = 2
+
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
@@ -107,17 +122,6 @@ type Message struct {
 	Type string      `json:"type"`
 	Data interface{} `json:"data"`
 }
-
-// nightLenInMinutes is the baseline night length in in-game minutes (see winTimeGameSeconds).
-const nightLenInMinutes = 6
-
-// gameSecondsPerTick is in-game seconds advanced each sim tick; keep equal to the real tick
-// interval in seconds so wall clock matches the night clock (night ends after nightLenInMinutes
-// of in-game time).
-const gameSecondsPerTick = 5
-
-// maxNightGuest is the highest night selectable without a logged-in WebSocket (?token= JWT).
-const maxNightGuest int16 = 2
 
 // clampNightProgressionLoggedIn lowers requested night until night 1 or previous night is in wins table.
 func clampNightProgressionLoggedIn(userID int64, requested int16) int16 {
@@ -408,10 +412,10 @@ func advanceLobbySimOneTick(lobbyID string) {
 
 	room.Time += int16(gameSecondsPerTick)
 	if room.LHSDoorDown {
-		room.Power -= gameSecondsPerTick
+		room.Power -= powerDrainPerClosedDoorPerTick
 	}
 	if room.RHSDoorDown {
-		room.Power -= gameSecondsPerTick
+		room.Power -= powerDrainPerClosedDoorPerTick
 	}
 	applyChargeEconomyTick(room, gameSecondsPerTick)
 	if room.Power <= 0 {

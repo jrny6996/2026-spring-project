@@ -184,9 +184,13 @@ inline bool resolve_tronic_draw_transform(
   const std::string ent_room =
       tronic_3d_pos_key(ent.id, ent.room_alias.c_str());
   const TronicPosition* tp = nullptr;
+  const TronicPositionMap* primary_map = nullptr;
   auto named = tronic_by_entity.find(tkey);
-  if (named != tronic_by_entity.end())
+  if (named != tronic_by_entity.end()) {
     tp = tronic_pos_for_room(&named->second, ent_room);
+    if (tp != nullptr)
+      primary_map = &named->second;
+  }
   if (!tp) {
     auto fb = tronic_by_entity.find("freddy");
     if (fb != tronic_by_entity.end())
@@ -198,6 +202,12 @@ inline bool resolve_tronic_draw_transform(
     *out_pos = tp->position;
     *out_axis = tp->rotationAxis;
     *out_angle = tp->rotationAngle;
+    if (primary_map != nullptr) {
+      const Vector3& lo = primary_map->layout_offset;
+      out_pos->x += lo.x;
+      out_pos->y += lo.y;
+      out_pos->z += lo.z;
+    }
   } else {
     *out_pos = default_pos;
     *out_axis = default_axis;
@@ -588,7 +598,7 @@ inline void draw_tronic_coords_debug_hud(
   }
 }
 
-/// Full-screen office HUD for P2 (toggle with E). Tap J/L to queue; T applies tick.
+/// Full-screen office HUD for P2 after E arms tasks; hold mouse L/R half to queue.
 inline void draw_p2_task_overlay(const GameState& state, bool show_overlay) {
   if (!show_overlay || state.is_player_one || !state.gameStarted ||
       state.p2_mask_down)
@@ -604,7 +614,8 @@ inline void draw_p2_task_overlay(const GameState& state, bool show_overlay) {
   const char* left_title = "GENERATE POWER";
   int tw = MeasureText(left_title, title_fs);
   DrawText(left_title, mid / 2 - tw / 2, sh / 5, title_fs, RAYWHITE);
-  const char* j_hint = is_dev ? "tap J (+ T tick)" : "tap J";
+  const char* j_hint =
+      is_dev ? "hold here (or J + T tick)" : "hold left mouse here";
   DrawText(j_hint, mid / 2 - MeasureText(j_hint, 18) / 2, sh / 5 + 30, 18,
            Fade(LIGHTGRAY, 0.92f));
 
@@ -612,7 +623,8 @@ inline void draw_p2_task_overlay(const GameState& state, bool show_overlay) {
   tw = MeasureText(right_title, title_fs);
   DrawText(right_title, mid + (sw - mid) / 2 - tw / 2, sh / 5, title_fs,
            RAYWHITE);
-  const char* l_hint = is_dev ? "tap L (+ T tick)" : "tap L";
+  const char* l_hint =
+      is_dev ? "hold here (or L + T tick)" : "hold left mouse here";
   DrawText(l_hint,
            mid + (sw - mid) / 2 - MeasureText(l_hint, 18) / 2, sh / 5 + 30, 18,
            Fade(LIGHTGRAY, 0.92f));
@@ -650,8 +662,9 @@ inline void draw_p2_task_overlay(const GameState& state, bool show_overlay) {
   DrawText(line, mid + 36, by - 26, 18, WHITE);
   bar(mid + 36, by, bw, bh, mw, (Color){220, 180, 90, 255});
 
-  DrawText("Q: mask", sw / 2 - MeasureText("Q: mask", 16) / 2, sh - 36, 16,
-           Fade(LIGHTGRAY, 0.85f));
+  DrawText("E: close tasks   |   Q: mask",
+           sw / 2 - MeasureText("E: close tasks   |   Q: mask", 16) / 2, sh - 36,
+           16, Fade(LIGHTGRAY, 0.85f));
 }
 
 inline void draw_main_scene_2d(
@@ -696,12 +709,13 @@ inline void draw_main_scene_2d(
     DrawText(mask_label, 10, mask_y, 16, mask_color);
     if constexpr (is_dev) {
       if (state.gameStarted && !state.p2_mask_down) {
-        DrawText("E: tasks  |  tap J/L to queue  |  T = apply tick", 10, 100,
-                 14, Fade(SKYBLUE, 0.88f));
+        DrawText(
+            "E: arm tasks (office) then hold mouse L/R  |  J/L + T dev  |  T tick",
+            10, 100, 14, Fade(SKYBLUE, 0.88f));
       }
     } else if (state.gameStarted && !state.p2_mask_down) {
-      DrawText("E: tasks  |  tap J / L", 10, mask_y + 22, 14,
-               Fade(SKYBLUE, 0.88f));
+      DrawText("E in office: tasks on, then hold left mouse on left/right half",
+               10, mask_y + 22, 14, Fade(SKYBLUE, 0.88f));
     }
   }
   if (show_tronic_coords_debug) {

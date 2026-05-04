@@ -71,7 +71,7 @@ Install **Doxygen** (e.g. Debian/Ubuntu: `sudo apt install doxygen`). From `clie
 
 HTML is written to **`client_wasm/doxygen-html/`** (gitignored). Open `doxygen-html/index.html` in a browser.
 
-Configuration is in **`client_wasm/Doxyfile`**. Third-party **nlohmann/json** under `include/nlohmann/` is excluded. `EXTRACT_ALL = YES` is on so classes and functions appear even before you add `///` comments; tighten that later with `WARN_IF_UNDOCUMENTED = YES` once you want stricter coverage.
+Configuration is in **`client_wasm/Doxyfile`**. HTML is styled with **[Doxygen Awesome](https://jothepro.github.io/doxygen-awesome-css/)** (`client_wasm/doxygen-awesome-css/`, pinned to v2.4.2). Third-party **nlohmann/json** under `include/nlohmann/` is excluded. `EXTRACT_ALL = YES` is on so classes and functions appear even before you add `///` comments; tighten that later with `WARN_IF_UNDOCUMENTED = YES` once you want stricter coverage.
 
 ## GitHub Pages (this documentation + C++ HTML)
 

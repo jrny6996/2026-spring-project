@@ -35,6 +35,9 @@ jobs:
         with:
           source: ./docs
           destination: ./_site/docs
+      # jekyll-build-pages runs Jekyll as root; _site is root-owned otherwise mkdir/cp fail.
+      - name: Own _site for follow-up steps
+        run: sudo chown -R "$(id -u):$(id -g)" _site
       - name: Install Doxygen
         run: sudo apt-get update && sudo apt-get install -y doxygen
       - name: Generate C++ API (Doxygen)

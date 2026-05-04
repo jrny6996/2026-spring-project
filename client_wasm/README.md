@@ -3,6 +3,22 @@
 This provides a base project template which builds with
 [CMake](https://cmake.org).
 
+## C++ API documentation (Doxygen)
+
+Install the `doxygen` package, then from this directory:
+
+```bash
+# Debian / Ubuntu
+sudo apt install doxygen
+
+./doxygen.sh
+# same as: doxygen Doxyfile
+```
+
+Other platforms: [doxygen.nl/download](https://www.doxygen.nl/download.html) or `brew install doxygen` (macOS).
+
+Open **`doxygen-html/index.html`**. Output is listed in `.gitignore`; CI copies it to GitHub Pages under **`/cpp/`** on deploy.
+
 ## Usage
 
 To compile the game, use one of the following dependending on your build

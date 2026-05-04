@@ -1,0 +1,39 @@
+# Doxygen — WASM / raylib C++ client (run from this directory: doxygen Doxyfile)
+
+DOXYFILE_ENCODING      = UTF-8
+PROJECT_NAME           = "2026 Spring Project — WASM Client"
+PROJECT_BRIEF          = "raylib + Emscripten browser client (C++)."
+OUTPUT_DIRECTORY       = doxygen-html
+ALLOW_UNICODE_NAMES    = YES
+OUTPUT_LANGUAGE        = English
+
+# Document everything we parse; most symbols lack \\brief comments for now.
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = NO
+EXTRACT_STATIC         = YES
+QUIET                  = YES
+WARN_IF_UNDOCUMENTED   = NO
+WARN_NO_PARAMDOC       = NO
+
+INPUT                  = .
+RECURSIVE              = YES
+FILE_PATTERNS          = *.cpp *.hpp *.h
+EXCLUDE                = include/nlohmann
+EXCLUDE_PATTERNS       = */build/* \
+                         */doxygen-html/*
+
+USE_MDFILE_AS_MAINPAGE = README.md
+
+GENERATE_HTML          = YES
+HTML_OUTPUT            = .
+HTML_DYNAMIC_SECTIONS  = YES
+GENERATE_TREEVIEW      = YES
+SEARCHENGINE           = YES
+SOURCE_BROWSER         = YES
+STRIP_FROM_PATH        = .
+
+GENERATE_LATEX         = NO
+GENERATE_XML           = NO
+HAVE_DOT               = NO
+
+ALIASES                =

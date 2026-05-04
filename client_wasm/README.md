@@ -17,7 +17,7 @@ sudo apt install doxygen
 
 Other platforms: [doxygen.nl/download](https://www.doxygen.nl/download.html) or `brew install doxygen` (macOS).
 
-Open **`doxygen-html/index.html`**. Output is listed in `.gitignore`; CI copies it to GitHub Pages under **`/cpp/`** on deploy.
+Open **`doxygen-html/index.html`**. Output is listed in `.gitignore`; CI copies it to GitHub Pages under **`/docs/cpp/`** on deploy.
 
 ## Usage
 

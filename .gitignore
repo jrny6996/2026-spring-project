@@ -5,3 +5,6 @@ node_modules/
 tmp/
 wasmdist/
 .env
+
+# Doxygen HTML (generated; see client_wasm/Doxyfile)
+client_wasm/doxygen-html/

@@ -1,7 +1,8 @@
 title: "2026 Spring Project — Architecture"
 description: "MIS independent study: build, server, WASM client, game state, economy, and scene flow."
 url: "https://jrny6996.github.io"
-baseurl: "/2026-spring-project"
+# Project Pages URL: https://<user>.github.io/<repo>/docs/
+baseurl: "/2026-spring-project/docs"
 theme: minima
 markdown: kramdown
 

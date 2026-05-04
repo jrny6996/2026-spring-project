@@ -34,7 +34,16 @@ jobs:
         uses: actions/jekyll-build-pages@v1
         with:
           source: ./docs
-          destination: ./_site
+          destination: ./_site/docs
+      - name: Install Doxygen
+        run: sudo apt-get update && sudo apt-get install -y doxygen
+      - name: Generate C++ API (Doxygen)
+        working-directory: client_wasm
+        run: doxygen Doxyfile
+      - name: Add Doxygen HTML under docs/
+        run: mkdir -p _site/docs/cpp && cp -r client_wasm/doxygen-html/. _site/docs/cpp/
+      - name: Root page redirects to docs/
+        run: cp .github/pages-root-index.html _site/index.html
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
 

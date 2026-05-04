@@ -1,19 +1,20 @@
 ## Documentation (GitHub Pages)
 
-**Site:** [jrny6996.github.io/2026-spring-project](https://jrny6996.github.io/2026-spring-project/)
+**Site:** [jrny6996.github.io/2026-spring-project/docs/](https://jrny6996.github.io/2026-spring-project/docs/) (repo root redirects to `docs/`)
 
 | Page | Description |
 |------|-------------|
-| [Home](https://jrny6996.github.io/2026-spring-project/) | Overview and section index |
-| [Independent study](https://jrny6996.github.io/2026-spring-project/independent-study/) | MIS proposal: scope, learning goals, deliverables |
-| [Build](https://jrny6996.github.io/2026-spring-project/build/) | WASM client, Go server, Docker |
-| [Server](https://jrny6996.github.io/2026-spring-project/server/) | HTTP, WebSockets, sim |
-| [Client](https://jrny6996.github.io/2026-spring-project/client/) | raylib + Emscripten |
-| [Game state](https://jrny6996.github.io/2026-spring-project/game-state/) | Wire model and authoritative state |
-| [Economy](https://jrny6996.github.io/2026-spring-project/economy/) | Power, doors, queues |
-| [Scene swapping](https://jrny6996.github.io/2026-spring-project/scene-swapping/) | Menus → game flow |
+| [Home](https://jrny6996.github.io/2026-spring-project/docs/) | Overview and section index |
+| [Independent study](https://jrny6996.github.io/2026-spring-project/docs/independent-study/) | MIS proposal: scope, learning goals, deliverables |
+| [Build](https://jrny6996.github.io/2026-spring-project/docs/build/) | WASM client, Go server, Docker |
+| [Server](https://jrny6996.github.io/2026-spring-project/docs/server/) | HTTP, WebSockets, sim |
+| [Client](https://jrny6996.github.io/2026-spring-project/docs/client/) | raylib + Emscripten |
+| [Game state](https://jrny6996.github.io/2026-spring-project/docs/game-state/) | Wire model and authoritative state |
+| [Economy](https://jrny6996.github.io/2026-spring-project/docs/economy/) | Power, doors, queues |
+| [Scene swapping](https://jrny6996.github.io/2026-spring-project/docs/scene-swapping/) | Menus → game flow |
+| [C++ API (Doxygen)](https://jrny6996.github.io/2026-spring-project/docs/cpp/) | Auto-generated reference for `client_wasm/` (deployed with Pages) |
 
-Source Markdown lives in [`docs/`](docs/).
+Source Markdown lives in [`docs/`](docs/). Regenerate C++ HTML locally from [`client_wasm/`](client_wasm/): install Doxygen (`sudo apt install doxygen` on Debian/Ubuntu), then run [`client_wasm/doxygen.sh`](client_wasm/doxygen.sh) or `doxygen Doxyfile`. Output: gitignored `client_wasm/doxygen-html/`.
 
 ## Source code
 

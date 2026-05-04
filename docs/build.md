@@ -58,12 +58,32 @@ Use `sync` when you already built in `client_wasm/build` and only need to refres
 
 `docker-compose.yml` runs the app on port **6789** (internal) and can run **cloudflared** beside it for tunneling. Set `JWT_SECRET` (32+ characters in production), `HTTP_ADDR`, and `DATABASE_PATH` as needed.
 
-## GitHub Pages (this documentation)
+## C++ API reference (Doxygen)
 
-Documentation lives in `docs/` and is built with Jekyll via GitHub Actions (`.github/workflows/jekyll-gh-pages.yml`). The workflow should use **`source: ./docs`** so only the documentation tree is processed, not the C++ or Go trees at the repo root.
+The WASM client under `client_wasm/` is documented with **[Doxygen](https://www.doxygen.nl/)**.
 
-After enabling **GitHub Pages** from GitHub Actions in the repository settings, pushes to the default branch deploy the site to:
+Install **Doxygen** (e.g. Debian/Ubuntu: `sudo apt install doxygen`). From `client_wasm/`:
 
-`https://jrny6996.github.io/2026-spring-project/`
+```bash
+./doxygen.sh
+# or: doxygen Doxyfile
+```
 
-(Adjust `baseurl` in `docs/_config.yml` if the repository name or user changes.)
+HTML is written to **`client_wasm/doxygen-html/`** (gitignored). Open `doxygen-html/index.html` in a browser.
+
+Configuration is in **`client_wasm/Doxyfile`**. Third-party **nlohmann/json** under `include/nlohmann/` is excluded. `EXTRACT_ALL = YES` is on so classes and functions appear even before you add `///` comments; tighten that later with `WARN_IF_UNDOCUMENTED = YES` once you want stricter coverage.
+
+## GitHub Pages (this documentation + C++ HTML)
+
+Architecture Markdown lives in `docs/` and is built with Jekyll via GitHub Actions (`.github/workflows/jekyll-gh-pages.yml`). Jekyll output and Doxygen HTML are placed under **`_site/docs/`** so everything is served from the **`/docs`** path on GitHub Pages:
+
+- Jekyll pages: **`/2026-spring-project/docs/`** (e.g. `/2026-spring-project/docs/build/`)
+- C++ API: **`/2026-spring-project/docs/cpp/`**
+
+A minimal **`_site/index.html`** redirects the repo site root to **`docs/`**.
+
+`baseurl` in `docs/_config.yml` must stay **`/2026-spring-project/docs`** (change the repo slug if yours differs).
+
+After enabling **GitHub Pages** from GitHub Actions in the repository settings, pushes to the default branch deploy to:
+
+`https://jrny6996.github.io/2026-spring-project/docs/`

@@ -16,6 +16,7 @@ The project is also framed as an **MIS Independent Study**; the formal proposal 
 | [Build]({{ site.baseurl }}/build/) | Local dev, WASM build, Docker, syncing artifacts into the server |
 | [Server]({{ site.baseurl }}/server/) | HTTP routes, WebSocket protocol, sim ticker, auth, persistence |
 | [Client]({{ site.baseurl }}/client/) | raylib + Emscripten, header-only style, WebSocket helpers |
+| [C++ API (Doxygen)]({{ site.baseurl }}/cpp/) | Generated reference for `client_wasm/` (classes, files, source browser) |
 | [Game state]({{ site.baseurl }}/game-state/) | Server `GameRoomState` / sim vs client `GameState`, JSON wire model |
 | [Economy]({{ site.baseurl }}/economy/) | Power, doors, P2 music box, queues drained per tick |
 | [Scene swapping]({{ site.baseurl }}/scene-swapping/) | `Scene` base class, menu → main handoff, loading strategy |

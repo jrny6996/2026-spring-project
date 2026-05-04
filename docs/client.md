@@ -13,6 +13,10 @@ nav_order: 5
 
 Entry point is **`main.cpp`**: allocates the WebSocket URL from the current page (night query, JWT from `localStorage`), initializes **`WsContext`** with a global **`GameState`**, and runs **`init_menu`** as the first **`Scene`**.
 
+## C++ API reference (Doxygen)
+
+Auto-generated HTML for headers and `main.cpp` is published with GitHub Pages at **[C++ API]({{ site.baseurl }}/cpp/)** (run `doxygen Doxyfile` locally from `client_wasm/`; see [Build]({{ site.baseurl }}/build/)).
+
 ## Why mostly `.hpp` (header-only organization)
 
 Almost all game code lives in **`.hpp`** files included from **`main.cpp`** (for example `menu.hpp`, `MainScene.hpp`, `ws_init.hpp`). There is **no `.cpp` per translation unit** for those modules—only **`main.cpp`** pulls them in.

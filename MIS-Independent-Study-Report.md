@@ -3,7 +3,7 @@
 **Student:** Jonathan Clark  
 **Topic:** Browser-based 3D multiplayer horror game (WebGL stack + custom game server)  
 **Repository:** [2026-spring-project](https://github.com/jrny6996/2026-spring-project)  
-**Living documentation (GitHub Pages):** [Documentation site](https://jrny6996.github.io/2026-spring-project/)
+**Living documentation (GitHub Pages):** [Documentation site](https://jrny6996.github.io/2026-spring-project/docs/)
 
 This report maps the **approved independent study proposal** to what is **implemented in the codebase today**, and states **deliverable status** for grading or demo planning.
 

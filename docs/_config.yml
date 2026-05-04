@@ -1,0 +1,15 @@
+title: "2026 Spring Project — Architecture"
+description: "Build, server, WASM client, game state, economy, and scene flow."
+url: "https://jrny6996.github.io"
+baseurl: "/2026-spring-project"
+theme: minima
+markdown: kramdown
+
+# Minima top navigation (paths relative to site source = docs/)
+header_pages:
+  - build.md
+  - server.md
+  - client.md
+  - game-state.md
+  - economy.md
+  - scene-swapping.md

@@ -1,0 +1,32 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: game-server
+    restart: unless-stopped
+    environment:
+      JWT_SECRET: ${JWT_SECRET:-}
+      HTTP_ADDR: ${HTTP_ADDR:-:6789}
+      DATABASE_PATH: ${DATABASE_PATH:-/data/app.db}
+    volumes:
+      - sqlite-data:/data
+    expose:
+      - "6789"
+
+  tunnel:
+    container_name: cloudflared-tunnel
+    image: cloudflare/cloudflared
+    restart: unless-stopped
+    command: tunnel run
+    depends_on:
+      - app
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TOKEN:-}
+
+networks:
+  default:
+    name: app-network
+
+volumes:
+  sqlite-data:

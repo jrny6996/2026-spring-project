@@ -8,6 +8,8 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -476,12 +478,35 @@ func main() {
 
 	authTmpl := template.Must(template.ParseFiles("auth.html"))
 
+	if b, err := os.ReadFile("play.html"); err != nil {
+		log.Printf("warning: play.html not read (%v); / will be empty", err)
+	} else {
+		playPageHTML = string(b)
+	}
+
+	wasmRoot := strings.TrimSpace(os.Getenv("WASMDIST"))
+	if wasmRoot == "" {
+		wasmRoot = "wasmdist"
+	}
+	if _, err := os.Stat(filepath.Join(wasmRoot, "game.html")); err != nil {
+		alt := filepath.Join("server", "wasmdist")
+		if _, err2 := os.Stat(filepath.Join(alt, "game.html")); err2 == nil {
+			wasmRoot = alt
+		} else {
+			wd, _ := os.Getwd()
+			log.Fatalf("wasmdist/game.html not found (looked in %q and %q). cwd=%q — run: cd client_wasm && ./run.sh",
+				wasmRoot, alt, wd)
+		}
+	}
+	absW, _ := filepath.Abs(wasmRoot)
+	log.Printf("serving /game/* from %s", absW)
+
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_, _ = io.WriteString(w, playPageHTML)
 	})
 
-	http.Handle("/game/", http.StripPrefix("/game/", http.FileServer(http.FS(wasmGameSubFS()))))
+	http.Handle("/game/", http.StripPrefix("/game/", http.FileServer(http.Dir(wasmRoot))))
 
 	http.HandleFunc("/auth", func(w http.ResponseWriter, r *http.Request) {
 		authTmpl.Execute(w, nil)

@@ -1,0 +1,5 @@
+.git
+node_modules
+client_wasm/build
+**/.DS_Store
+server/app.db

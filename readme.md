@@ -1,6 +1,5 @@
 ## Documentation (GitHub Pages)
 
-### Game URL: [spring-2026.microhosted.com](https://spring-2026.microhosted.com)
 
 ### **Docs:** [jrny6996.github.io/2026-spring-project/docs/](https://jrny6996.github.io/2026-spring-project/docs/) 
 

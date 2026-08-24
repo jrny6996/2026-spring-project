@@ -44,6 +44,14 @@ CREATE TABLE IF NOT EXISTS wins (
 );`); err != nil {
 		return err
 	}
+	if _, err := d.Exec(`
+CREATE TABLE IF NOT EXISTS config (
+	key TEXT PRIMARY KEY,
+	value TEXT NOT NULL,
+	updated_at TEXT NOT NULL
+);`); err != nil {
+		return err
+	}
 	// Legacy: copy night_completions into wins if that table exists (older installs).
 	_, _ = d.Exec(`
 INSERT OR IGNORE INTO wins (user_id, night, won_at)
@@ -129,4 +137,21 @@ func createUser(username, passwordHash string) (int64, error) {
 		return 0, err
 	}
 	return res.LastInsertId()
+}
+
+func loadConfigValue(key string) (string, error) {
+	var out string
+	err := db.QueryRow(`SELECT value FROM config WHERE key = ?`, key).Scan(&out)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	return out, err
+}
+
+func saveConfigValue(key, value string) error {
+	_, err := db.Exec(`
+INSERT INTO config (key, value, updated_at) VALUES (?, ?, ?)
+ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+		key, value, time.Now().UTC().Format(time.RFC3339))
+	return err
 }

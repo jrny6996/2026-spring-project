@@ -73,6 +73,7 @@ type GameRoomState struct {
 	P2OfficeDanger  int        `json:"p2OfficeDanger"`
 	P1Lost          bool       `json:"-"`
 	P2Lost          bool       `json:"p2Lost"`
+	Paused          bool       `json:"paused"`
 	NightNum        int16      `json:"nightNum"`
 	Rooms           []Room     `json:"rooms"`
 	HostIsPlayerOne bool       `json:"-"`
@@ -98,6 +99,7 @@ type gameStateWire struct {
 	IsPlayerOne bool            `json:"isPlayerOne"`
 	P2InLobby   bool            `json:"p2InLobby"` // second player joined this lobby
 	SimEntities []SimEntityWire `json:"simEntities,omitempty"`
+	Layout      SceneLayout     `json:"layout"`
 }
 
 func stateForClient(room *GameRoomState, remoteAddr, lobbyID string) gameStateWire {
@@ -117,6 +119,7 @@ func stateForClient(room *GameRoomState, remoteAddr, lobbyID string) gameStateWi
 	if room.Sim != nil {
 		w.SimEntities = room.Sim.SnapshotSimEntities()
 	}
+	w.Layout = sceneLayoutSnapshot()
 	return w
 }
 
@@ -407,8 +410,15 @@ func applyChargeEconomyTick(room *GameRoomState, gameSeconds int) {
 // advanceLobbySimOneTick advances room.Time, economy, and sim by one tick (gameSecondsPerTick
 // in-game seconds). Used by the periodic ticker and by manual "step" messages.
 func advanceLobbySimOneTick(lobbyID string) {
+	advanceLobbySimOneTickWithMode(lobbyID, false)
+}
+
+func advanceLobbySimOneTickWithMode(lobbyID string, ignorePause bool) {
 	room, exists := lobbySet[lobbyID]
 	if !exists || room == nil || !room.Started || room.Sim == nil {
+		return
+	}
+	if room.Paused && !ignorePause {
 		return
 	}
 
@@ -475,6 +485,7 @@ func main() {
 		log.Fatal(err)
 	}
 	defer db.Close()
+	loadSceneLayoutFromDB()
 
 	authTmpl := template.Must(template.ParseFiles("auth.html"))
 
@@ -625,6 +636,7 @@ func newGameRoomState(host string) GameRoomState {
 		RHSDoorDown:    false,
 		P2MaskDown:     false,
 		P2OfficeDanger: 0,
+		Paused:         false,
 		Rooms: []Room{
 			{
 				EntityID:   0,
@@ -749,6 +761,7 @@ func handleStartGame(conn *websocket.Conn, r *http.Request) {
 	room.RHSDoorDown = false
 	room.P2MaskDown = false
 	room.P2OfficeDanger = 0
+	room.Paused = false
 	room.P1Lost = false
 	room.P2Lost = false
 	room.p1PowerQueued = 0
@@ -757,6 +770,10 @@ func handleStartGame(conn *websocket.Conn, r *http.Request) {
 	room.NightNum = wantNight
 	room.Sim = NewGameState(room.NightNum)
 	room.Sim.SpawnEntities()
+	layout := sceneLayoutSnapshot()
+	for tronicKey, roomAlias := range layout.TronicRooms {
+		_ = room.Sim.MoveEntityToRoomAlias(tronicKey, roomAlias)
+	}
 	log.Printf("lobby %s: SpawnEntities done, sim ready night=%d winAtGameSec=%d", user.LobbyID, room.NightNum, winTimeGameSeconds(room.NightNum))
 	lid := user.LobbyID
 	for _, u := range connectedUsersSet {
@@ -781,7 +798,7 @@ func handleStepGame(conn *websocket.Conn, r *http.Request) {
 		writeJSONToUser(user, "error", "game-not-started")
 		return
 	}
-	advanceLobbySimOneTick(user.LobbyID)
+	advanceLobbySimOneTickWithMode(user.LobbyID, true)
 }
 
 func handleActionGame(conn *websocket.Conn, r *http.Request, content string) {
@@ -903,6 +920,147 @@ func handleActionGame(conn *websocket.Conn, r *http.Request, content string) {
 		if room.P2MaskDown && room.Sim.AnyEntityInRoom("player_two_office") {
 			room.P2OfficeDanger = 0
 			room.Sim.MoveEntitiesBackFromRoom("player_two_office")
+		}
+	case "pause":
+		if len(parts) != 2 {
+			return
+		}
+		if room.Host != r.RemoteAddr {
+			return
+		}
+		if parts[1] == "toggle" {
+			room.Paused = !room.Paused
+		} else if parts[1] == "on" {
+			room.Paused = true
+		} else if parts[1] == "off" {
+			room.Paused = false
+		}
+	case "dbgtronic":
+		// dbgtronic:<tronic_key>:<x>:<y>:<z>:<rotation_deg>:<scale>
+		if len(parts) != 7 {
+			return
+		}
+		if room.Host != r.RemoteAddr {
+			return
+		}
+		x, err1 := strconv.ParseFloat(parts[2], 32)
+		y, err2 := strconv.ParseFloat(parts[3], 32)
+		z, err3 := strconv.ParseFloat(parts[4], 32)
+		rot, err4 := strconv.ParseFloat(parts[5], 32)
+		scale, err5 := strconv.ParseFloat(parts[6], 32)
+		if err1 != nil || err2 != nil || err3 != nil || err4 != nil || err5 != nil {
+			return
+		}
+		upsertTronicLayoutTweak(parts[1], TronicTweak{
+			Offset: Vec3{
+				X: float32(x),
+				Y: float32(y),
+				Z: float32(z),
+			},
+			RotationDeg: float32(rot),
+			Scale:       float32(scale),
+		})
+	case "dbgcam":
+		// dbgcam:<room_alias>:<ex>:<ey>:<ez>:<tx>:<ty>:<tz>:<fovy>
+		if len(parts) != 9 {
+			return
+		}
+		if room.Host != r.RemoteAddr {
+			return
+		}
+		ex, err1 := strconv.ParseFloat(parts[2], 32)
+		ey, err2 := strconv.ParseFloat(parts[3], 32)
+		ez, err3 := strconv.ParseFloat(parts[4], 32)
+		tx, err4 := strconv.ParseFloat(parts[5], 32)
+		ty, err5 := strconv.ParseFloat(parts[6], 32)
+		tz, err6 := strconv.ParseFloat(parts[7], 32)
+		fv, err7 := strconv.ParseFloat(parts[8], 32)
+		if err1 != nil || err2 != nil || err3 != nil || err4 != nil ||
+			err5 != nil || err6 != nil || err7 != nil {
+			return
+		}
+		upsertCameraPose(parts[1], CameraPose{
+			EyePos: Vec3{
+				X: float32(ex),
+				Y: float32(ey),
+				Z: float32(ez),
+			},
+			EyeTarget: Vec3{
+				X: float32(tx),
+				Y: float32(ty),
+				Z: float32(tz),
+			},
+			Fovy: float32(fv),
+		})
+	case "dbgroommod":
+		// dbgroommod:<room_alias>:<x>:<y>:<z>:<scale>
+		if len(parts) != 6 {
+			return
+		}
+		if room.Host != r.RemoteAddr {
+			return
+		}
+		x, err1 := strconv.ParseFloat(parts[2], 32)
+		y, err2 := strconv.ParseFloat(parts[3], 32)
+		z, err3 := strconv.ParseFloat(parts[4], 32)
+		s, err4 := strconv.ParseFloat(parts[5], 32)
+		if err1 != nil || err2 != nil || err3 != nil || err4 != nil {
+			return
+		}
+		upsertRoomModifier(parts[1], TransformModifier{
+			Offset: Vec3{
+				X: float32(x),
+				Y: float32(y),
+				Z: float32(z),
+			},
+			Scale: float32(s),
+		})
+	case "dbgglobal":
+		// dbgglobal:<x>:<y>:<z>:<scale>
+		if len(parts) != 5 {
+			return
+		}
+		if room.Host != r.RemoteAddr {
+			return
+		}
+		x, err1 := strconv.ParseFloat(parts[1], 32)
+		y, err2 := strconv.ParseFloat(parts[2], 32)
+		z, err3 := strconv.ParseFloat(parts[3], 32)
+		s, err4 := strconv.ParseFloat(parts[4], 32)
+		if err1 != nil || err2 != nil || err3 != nil || err4 != nil {
+			return
+		}
+		upsertGlobalModifier(TransformModifier{
+			Offset: Vec3{
+				X: float32(x),
+				Y: float32(y),
+				Z: float32(z),
+			},
+			Scale: float32(s),
+		})
+	case "dbgmoveroom":
+		// dbgmoveroom:<tronic_key>:<room_alias>
+		if len(parts) != 3 {
+			return
+		}
+		if room.Host != r.RemoteAddr {
+			return
+		}
+		if room.Sim == nil {
+			return
+		}
+		_ = room.Sim.MoveEntityToRoomAlias(parts[1], parts[2])
+	case "dbgsaveroom":
+		// dbgsaveroom:<tronic_key>:<room_alias>
+		if len(parts) != 3 {
+			return
+		}
+		if room.Host != r.RemoteAddr {
+			return
+		}
+		upsertTronicRoom(parts[1], parts[2])
+		if room.Sim != nil {
+			_ = room.Sim.MoveEntityToRoomAlias(parts[1], parts[2])
 		}
 	}
 	broadcastStateToLobby(user.LobbyID)

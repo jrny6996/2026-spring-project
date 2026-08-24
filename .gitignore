@@ -8,3 +8,4 @@ wasmdist/
 
 # Doxygen HTML (generated; see client_wasm/Doxyfile)
 client_wasm/doxygen-html/
+build-debug/

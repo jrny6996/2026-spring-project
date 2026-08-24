@@ -46,6 +46,7 @@ From the repository root:
 
 - **`npm run dev`** — runs the WASM build script and the Go server concurrently (see `package.json`).
 - **`npm run sync`** — copies a pre-built `client_wasm/build/` output into `server/wasmdist/` without rebuilding.
+- **`./run_hot.sh`** — one-command dev loop: builds Emscripten output, syncs to `server/wasmdist/`, starts Go, and (when `inotifywait` exists) rebuilds on `client_wasm/` edits.
 
 Use `sync` when you already built in `client_wasm/build` and only need to refresh what the server serves.
 

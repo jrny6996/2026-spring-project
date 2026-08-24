@@ -1,4 +1,5 @@
 #include "Scene.hpp"
+#include "audio_runtime.hpp"
 #include "menu.hpp"
 #include "raylib.h"
 
@@ -49,9 +50,16 @@ GameState game_state;
 WsContext ctx;
 EMSCRIPTEN_WEBSOCKET_T socket = 0;
 
+extern "C" {
+EMSCRIPTEN_KEEPALIVE void wasm_on_audio_toggle(int enabled) {
+  audio_runtime::set_enabled(enabled != 0);
+}
+}
+
 // Main loop function (required by emscripten)
 void MainLoop(void) {
 
+  audio_runtime::update(game_state);
   curr_scene->listen();
   curr_scene->update(curr_scene, game_state, socket);
   // live.update();

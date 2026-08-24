@@ -467,6 +467,29 @@ func nameForEntityID(id int16) string {
 	}
 }
 
+func entityIDForTronicKey(key string) int16 {
+	switch key {
+	case "freddy":
+		return 1
+	case "bonnie":
+		return 2
+	case "chica":
+		return 3
+	case "foxy":
+		return 4
+	case "toy_freddy":
+		return 11
+	case "toy_bonnie":
+		return 12
+	case "toy_chica":
+		return 13
+	case "toy_foxy":
+		return 14
+	default:
+		return 0
+	}
+}
+
 // SnapshotSimEntities builds the list of animatronics and their room aliases for clients.
 func (gs *GameState) SnapshotSimEntities() []SimEntityWire {
 	if gs == nil || gs.Tracker == nil {
@@ -613,6 +636,41 @@ func (gs *GameState) MoveEntitiesBackFromRoom(alias string) {
 			gs.Tracker.MoveBack(ent)
 		}
 	}
+}
+
+func (gs *GameState) MoveEntityToRoomAlias(tronicKey, roomAlias string) bool {
+	if gs == nil || gs.Tracker == nil {
+		return false
+	}
+	id := entityIDForTronicKey(tronicKey)
+	if id <= 0 {
+		return false
+	}
+	target := gs.FindNodeByAlias(roomAlias)
+	if target == nil {
+		return false
+	}
+	curr := gs.Tracker.EntityPositions[id]
+	if curr == nil {
+		return false
+	}
+	var ent Entity
+	found := false
+	for _, e := range curr.Entities {
+		if e.Id == id {
+			ent = e
+			found = true
+			break
+		}
+	}
+	if !found {
+		ent = Entity{Id: id, Name: nameForEntityID(id)}
+	}
+	curr.Entities = removeEntity(curr.Entities, id)
+	target.Entities = append(target.Entities, ent)
+	gs.Tracker.EntityPositions[id] = target
+	gs.Tracker.EntityPaths[id] = []*GameGraphNode{target}
+	return true
 }
 
 func main1() {

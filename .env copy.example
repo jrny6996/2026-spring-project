@@ -1,0 +1,16 @@
+# Copy to .env and adjust values: cp .env.example .env
+# docker compose reads .env from the project root automatically.
+
+# Required in production: signing key for JWTs (see server/auth.go).
+JWT_SECRET=kfeb232112egcfnqhi3
+
+# Listen address inside the container (default matches Dockerfile).
+HTTP_ADDR=:6789
+
+# SQLite file path inside the container (must stay under /data for the default volume).
+DATABASE_PATH=/data/app.db
+
+# Optional: Cloudflare Tunnel token (Zero Trust → Networks → Tunnels → your tunnel → Install connector).
+# Used only when you start the tunnel: `docker compose --profile cloudflare up`
+# Service name in compose: fnaf-tunnel. Without a token, cloudflared exits with status 255.
+CLOUDFLARE_TOKEN=eyJhIjoiMjFjYTUzNjJhN2IwZGJlNjY1MDI0MzBlZWY2NGRjNzMiLCJ0IjoiMDI1OWIwMzItMGEzOC00YWU0LTkwNzktNDM5ZGIyYWY0OTQ5IiwicyI6Ik16Z3pNRFV5WXpjdFpUazBZeTAwWlRNd0xXSTNOalF0Wm1SbE16YzVZV0kxTnpSaSJ9

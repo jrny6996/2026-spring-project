@@ -41,14 +41,30 @@ add_executable(${PROJECT_NAME} main.cpp)
 #set(raylib_VERBOSE 1)
 target_link_libraries(${PROJECT_NAME} raylib)
 target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_20)
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    target_compile_definitions(${PROJECT_NAME} PRIVATE CLIENT_DEBUG_BUILD=1)
+endif()
 
 # Web Configurations
 if (${PLATFORM} STREQUAL "Web")
     set_target_properties(${PROJECT_NAME} PROPERTIES SUFFIX ".html") # Tell Emscripten to build an game.html file.
     file(COPY ${CMAKE_SOURCE_DIR}/assets DESTINATION ${CMAKE_BINARY_DIR})
     # miniaudio (raylib) Web Audio reads Module.HEAPF32 from JS; Emscripten no longer exports heap views by default.
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -s USE_GLFW=3 -s ASSERTIONS=1 -s WASM=1 -s ASYNCIFY -s GL_ENABLE_GET_PROC_ADDRESS=1 -sEXPORTED_RUNTIME_METHODS=['HEAPF32','HEAPU8','HEAP32','HEAPU32'] -lwebsocket.js --preload-file assets ")
-    set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS "-sMIN_WEBGL_VERSION=2 -s ALLOW_MEMORY_GROWTH=1 -sMAX_WEBGL_VERSION=2 ")
+    # Keep preloaded asset packs in IndexedDB across reloads to avoid re-fetching heavy model data.
+    set(WEB_COMMON_LINK_FLAGS "-s USE_GLFW=3 -s WASM=1 -s ASYNCIFY -s GL_ENABLE_GET_PROC_ADDRESS=1 -sEXPORTED_RUNTIME_METHODS=['HEAPF32','HEAPU8','HEAP32','HEAPU32'] -lwebsocket.js --preload-file assets --use-preload-plugins --use-preload-cache")
+    set(WEB_PROFILE_LINK_FLAGS "")
+    if (CMAKE_BUILD_TYPE STREQUAL "Release")
+      # Release shell: full-width canvas and absolute fullscreen button.
+      set(WEB_PROFILE_LINK_FLAGS "--shell-file ${CMAKE_SOURCE_DIR}/shell_release.html -s ASSERTIONS=0")
+    elseif (CMAKE_BUILD_TYPE STREQUAL "Debug")
+      # Debug shell includes fullscreen/audio controls and debug-friendly overlay behavior.
+      set(WEB_PROFILE_LINK_FLAGS "--shell-file ${CMAKE_SOURCE_DIR}/shell_debug.html -s ASSERTIONS=2 -sSTACK_SIZE=2097152")
+    else()
+      # Debug profile keeps stronger diagnostics.
+      set(WEB_PROFILE_LINK_FLAGS "-s ASSERTIONS=2")
+    endif()
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${WEB_COMMON_LINK_FLAGS} ${WEB_PROFILE_LINK_FLAGS}")
+    set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS "-sMIN_WEBGL_VERSION=2 -s ALLOW_MEMORY_GROWTH=1 -sMAX_WEBGL_VERSION=2")
 
     endif()
 

@@ -221,6 +221,14 @@ inline void setup_pbr_shader_uniform_defaults(Shader& map_shader) {
                  &use_emissive, SHADER_UNIFORM_INT);
 }
 
+inline void set_pbr_ambient(Shader& map_shader, Vector3 ambient_rgb,
+                            float ambient_strength) {
+  SetShaderValue(map_shader, GetShaderLocation(map_shader, "ambientColor"),
+                 &ambient_rgb, SHADER_UNIFORM_VEC3);
+  SetShaderValue(map_shader, GetShaderLocation(map_shader, "ambient"),
+                 &ambient_strength, SHADER_UNIFORM_FLOAT);
+}
+
 inline bool set_pbr_light_enabled(PbrLightGPU* lights, int pbr_light_count,
                                   int index, bool enabled) {
   if (index < 0 || index >= pbr_light_count)

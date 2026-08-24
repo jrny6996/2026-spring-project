@@ -105,6 +105,70 @@ inline void send_p2_music_queued(EMSCRIPTEN_WEBSOCKET_T socket, int units) {
   send_json_message(socket, "action", std::string(buf));
 }
 
+inline void send_debug_pause_toggle(EMSCRIPTEN_WEBSOCKET_T socket) {
+  send_json_message(socket, "action", "pause:toggle");
+}
+
+inline void send_debug_tronic_offset(EMSCRIPTEN_WEBSOCKET_T socket,
+                                     const std::string& tronic_key, float x,
+                                     float y, float z, float rotation_deg,
+                                     float scale) {
+  char buf[220];
+  std::snprintf(buf, sizeof(buf), "dbgtronic:%s:%.4f:%.4f:%.4f:%.4f:%.4f",
+                tronic_key.c_str(), static_cast<double>(x),
+                static_cast<double>(y), static_cast<double>(z),
+                static_cast<double>(rotation_deg), static_cast<double>(scale));
+  send_json_message(socket, "action", std::string(buf));
+}
+
+inline void send_debug_camera_pose(EMSCRIPTEN_WEBSOCKET_T socket,
+                                   const std::string& room_alias, float ex,
+                                   float ey, float ez, float tx, float ty,
+                                   float tz, float fovy) {
+  char buf[256];
+  std::snprintf(buf, sizeof(buf),
+                "dbgcam:%s:%.4f:%.4f:%.4f:%.4f:%.4f:%.4f:%.4f",
+                room_alias.c_str(), static_cast<double>(ex),
+                static_cast<double>(ey), static_cast<double>(ez),
+                static_cast<double>(tx), static_cast<double>(ty),
+                static_cast<double>(tz), static_cast<double>(fovy));
+  send_json_message(socket, "action", std::string(buf));
+}
+
+inline void send_debug_room_modifier(EMSCRIPTEN_WEBSOCKET_T socket,
+                                     const std::string& room_alias, float x,
+                                     float y, float z, float scale) {
+  char buf[220];
+  std::snprintf(buf, sizeof(buf), "dbgroommod:%s:%.4f:%.4f:%.4f:%.4f",
+                room_alias.c_str(), static_cast<double>(x),
+                static_cast<double>(y), static_cast<double>(z),
+                static_cast<double>(scale));
+  send_json_message(socket, "action", std::string(buf));
+}
+
+inline void send_debug_global_modifier(EMSCRIPTEN_WEBSOCKET_T socket, float x,
+                                       float y, float z, float scale) {
+  char buf[180];
+  std::snprintf(buf, sizeof(buf), "dbgglobal:%.4f:%.4f:%.4f:%.4f",
+                static_cast<double>(x), static_cast<double>(y),
+                static_cast<double>(z), static_cast<double>(scale));
+  send_json_message(socket, "action", std::string(buf));
+}
+
+inline void send_debug_move_tronic_to_room(EMSCRIPTEN_WEBSOCKET_T socket,
+                                           const std::string& tronic_key,
+                                           const std::string& room_alias) {
+  send_json_message(socket, "action",
+                    std::string("dbgmoveroom:") + tronic_key + ":" + room_alias);
+}
+
+inline void send_debug_save_tronic_room(EMSCRIPTEN_WEBSOCKET_T socket,
+                                        const std::string& tronic_key,
+                                        const std::string& room_alias) {
+  send_json_message(socket, "action",
+                    std::string("dbgsaveroom:") + tronic_key + ":" + room_alias);
+}
+
 inline bool try_parse_json(const char* data, size_t len, json& out) {
   try {
     out = json::parse(std::string(data, len));
@@ -255,6 +319,9 @@ inline EM_BOOL on_message(int, const EmscriptenWebSocketMessageEvent* e,
           if (data.contains("p2MaskDown")) {
             state->p2_mask_down = data.value("p2MaskDown", false);
           }
+          if (data.contains("paused")) {
+            state->server_paused = data.value("paused", false);
+          }
           if (data.contains("power"))
             state->power = data.value("power", 30);
           if (data.contains("musicBoxWind"))
@@ -277,6 +344,116 @@ inline EM_BOOL on_message(int, const EmscriptenWebSocketMessageEvent* e,
               row.name = item.value("name", std::string());
               row.room_alias = item.value("roomAlias", std::string());
               state->sim_entities.push_back(std::move(row));
+            }
+          }
+          if (data.contains("layout") && data["layout"].is_object()) {
+            auto& layout = data["layout"];
+            const std::string layout_sig = layout.dump();
+            if (layout_sig != state->layout_wire_cache) {
+              state->layout_wire_cache = layout_sig;
+              state->layout_tronic_offsets.clear();
+              state->layout_camera_rows.clear();
+              if (layout.contains("tronicOffsets") &&
+                  layout["tronicOffsets"].is_object()) {
+                for (auto it = layout["tronicOffsets"].begin();
+                     it != layout["tronicOffsets"].end(); ++it) {
+                  if (!it.value().is_object())
+                    continue;
+                  LayoutOffsetRow row;
+                  row.key = it.key();
+                  row.x = it.value().value("x", 0.0f);
+                  row.y = it.value().value("y", 0.0f);
+                  row.z = it.value().value("z", 0.0f);
+                  row.rotation_deg = 0.0f;
+                  row.scale = 1.0f;
+                  state->layout_tronic_offsets.push_back(std::move(row));
+                }
+              }
+              if (layout.contains("tronicTweaks") &&
+                  layout["tronicTweaks"].is_object()) {
+                state->layout_tronic_offsets.clear();
+                for (auto it = layout["tronicTweaks"].begin();
+                     it != layout["tronicTweaks"].end(); ++it) {
+                  if (!it.value().is_object())
+                    continue;
+                  auto& t = it.value();
+                  if (!t.contains("offset") || !t["offset"].is_object())
+                    continue;
+                  LayoutOffsetRow row;
+                  row.key = it.key();
+                  row.x = t["offset"].value("x", 0.0f);
+                  row.y = t["offset"].value("y", 0.0f);
+                  row.z = t["offset"].value("z", 0.0f);
+                  row.rotation_deg = t.value("rotationDeg", 0.0f);
+                  row.scale = t.value("scale", 1.0f);
+                  if (row.scale <= 0.0f)
+                    row.scale = 1.0f;
+                  state->layout_tronic_offsets.push_back(std::move(row));
+                }
+              }
+              if (layout.contains("cameraPoses") &&
+                  layout["cameraPoses"].is_object()) {
+                for (auto it = layout["cameraPoses"].begin();
+                     it != layout["cameraPoses"].end(); ++it) {
+                  if (!it.value().is_object())
+                    continue;
+                  auto& c = it.value();
+                  if (!c.contains("eyePos") || !c["eyePos"].is_object() ||
+                      !c.contains("eyeTarget") || !c["eyeTarget"].is_object()) {
+                    continue;
+                  }
+                  LayoutCameraRow row;
+                  row.key = it.key();
+                  row.ex = c["eyePos"].value("x", 0.0f);
+                  row.ey = c["eyePos"].value("y", 0.0f);
+                  row.ez = c["eyePos"].value("z", 0.0f);
+                  row.tx = c["eyeTarget"].value("x", 0.0f);
+                  row.ty = c["eyeTarget"].value("y", 0.0f);
+                  row.tz = c["eyeTarget"].value("z", 0.0f);
+                  row.fovy = c.value("fovy", 55.0f);
+                  state->layout_camera_rows.push_back(std::move(row));
+                }
+              }
+              state->layout_room_modifiers.clear();
+              if (layout.contains("roomModifiers") &&
+                  layout["roomModifiers"].is_object()) {
+                for (auto it = layout["roomModifiers"].begin();
+                     it != layout["roomModifiers"].end(); ++it) {
+                  if (!it.value().is_object())
+                    continue;
+                  auto& m = it.value();
+                  if (!m.contains("offset") || !m["offset"].is_object())
+                    continue;
+                  LayoutRoomModifierRow row;
+                  row.key = it.key();
+                  row.x = m["offset"].value("x", 0.0f);
+                  row.y = m["offset"].value("y", 0.0f);
+                  row.z = m["offset"].value("z", 0.0f);
+                  row.scale = m.value("scale", 1.0f);
+                  if (row.scale <= 0.0f)
+                    row.scale = 1.0f;
+                  state->layout_room_modifiers.push_back(std::move(row));
+                }
+              }
+              state->layout_global_modifier = {};
+              if (layout.contains("globalModifier") &&
+                  layout["globalModifier"].is_object()) {
+                auto& g = layout["globalModifier"];
+                if (g.contains("offset") && g["offset"].is_object()) {
+                  state->layout_global_modifier.x =
+                      g["offset"].value("x", 0.0f);
+                  state->layout_global_modifier.y =
+                      g["offset"].value("y", 0.0f);
+                  state->layout_global_modifier.z =
+                      g["offset"].value("z", 0.0f);
+                }
+                state->layout_global_modifier.scale = g.value("scale", 1.0f);
+                if (state->layout_global_modifier.scale <= 0.0f)
+                  state->layout_global_modifier.scale = 1.0f;
+              } else {
+                state->layout_global_modifier.scale = 1.0f;
+              }
+              state->layout_revision++;
             }
           }
           state->printState();

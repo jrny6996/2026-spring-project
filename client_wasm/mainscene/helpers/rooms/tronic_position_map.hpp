@@ -26,6 +26,10 @@ class TronicPositionMap {
   /// Added to this character's resolved world position in every room (see
   /// `resolve_tronic_draw_transform`); use `add_layout_offset` to tweak one mesh globally.
   Vector3 layout_offset{0.0f, 0.0f, 0.0f};
+  /// Extra yaw degrees added to resolved room rotation.
+  float layout_rotation_deg = 0.0f;
+  /// Uniform multiplier applied to `scale` at draw time.
+  float layout_scale_mul = 1.0f;
   Color tint{WHITE};
   const Model& model;
   std::map<std::string, TronicPosition> pos_map{};

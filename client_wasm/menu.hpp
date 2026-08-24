@@ -5,12 +5,13 @@
 #include "raylib.h"
 #include "ws_init.hpp"
 
+#include <cstdio>
 #include <cstring>
 #include <iostream>
 
 class Menu : public Scene {
  private:
-  Scene* main_scene = nullptr;
+  MainScene* main_scene = nullptr;
   Texture2D clipboardTexture{};
   int start_btn_x = 0;
   int start_btn_y = 0;
@@ -19,6 +20,29 @@ class Menu : public Scene {
   std::string join_lobby_input = "";
   bool join_active = false;
   bool loaded_resources = false;
+  int warmup_frame_gate_ = 0;
+
+  void draw_asset_loading_screen(float progress) {
+    const int pct = static_cast<int>(progress * 100.0f);
+    BeginDrawing();
+    ClearBackground(BLACK);
+
+    const char* title = "Preparing assets";
+    DrawText(title, GetScreenWidth() / 2 - MeasureText(title, 44) / 2,
+             GetScreenHeight() / 2 - 78, 44, LIGHTGRAY);
+
+    char progress_line[96];
+    std::snprintf(progress_line, sizeof(progress_line), "%d%%", pct);
+    DrawText(progress_line,
+             GetScreenWidth() / 2 - MeasureText(progress_line, 40) / 2,
+             GetScreenHeight() / 2 - 12, 40, ORANGE);
+
+    DrawText("Loading 3D models into memory...",
+             GetScreenWidth() / 2 -
+                 MeasureText("Loading 3D models into memory...", 20) / 2,
+             GetScreenHeight() / 2 + 40, 20, Fade(SKYBLUE, 0.95f));
+    EndDrawing();
+  }
 
   void draw_join_text_input(int center_x, int y) {
     int width = 300;
@@ -162,8 +186,10 @@ class Menu : public Scene {
       return;
     }
 
-    // Boot: only "loading assets" until MainScene (models, shaders) is ready.
+    // Boot: construct MainScene once; proxies are instant, heavy models stream
+    // while this loading screen is visible.
     if (main_scene == nullptr) {
+      ShowCursor();
       BeginDrawing();
       ClearBackground(BLACK);
       const char* msg = "loading assets";
@@ -176,10 +202,23 @@ class Menu : public Scene {
       return;
     }
 
-    if (state.gameStarted && state.has_player_slot) {
+    if (state.gameStarted && state.has_player_slot && !main_scene->assets_ready()) {
+      // Throttle warmup cadence to limit frame-time spikes on wasm/main thread.
+      warmup_frame_gate_++;
+      if ((warmup_frame_gate_ % 6) == 0)
+        main_scene->prime_assets_step();
+      HideCursor();
+      draw_asset_loading_screen(main_scene->assets_progress());
+      return;
+    }
+
+    if (state.gameStarted && state.has_player_slot && main_scene->assets_ready()) {
+      ShowCursor();
       curr_scene = main_scene;
       return;
     }
+
+    ShowCursor();
 
     if (!loaded_resources) {
       Image clip_img = LoadImage("assets/images/clipboard.png");

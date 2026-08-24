@@ -14,6 +14,34 @@ struct SimEntityRow {
   std::string room_alias;
 };
 
+struct LayoutOffsetRow {
+  std::string key;
+  float x = 0.0f;
+  float y = 0.0f;
+  float z = 0.0f;
+  float rotation_deg = 0.0f;
+  float scale = 1.0f;
+};
+
+struct LayoutRoomModifierRow {
+  std::string key;
+  float x = 0.0f;
+  float y = 0.0f;
+  float z = 0.0f;
+  float scale = 1.0f;
+};
+
+struct LayoutCameraRow {
+  std::string key;
+  float ex = 0.0f;
+  float ey = 0.0f;
+  float ez = 0.0f;
+  float tx = 0.0f;
+  float ty = 0.0f;
+  float tz = 0.0f;
+  float fovy = 55.0f;
+};
+
 class GameState {
  public:
   std::string lobbyId;
@@ -46,6 +74,7 @@ class GameState {
   bool p2_in_lobby = false;
   /// P2 eliminated; P1 may use SPACE to charge at half rate.
   bool p2_lost = false;
+  bool server_paused = false;
 
   /// Security-camera check: server round-trip in progress; feed is suspended.
   bool check_camera_in_flight = false;
@@ -55,6 +84,12 @@ class GameState {
   bool check_camera_suspend_feed_for_request = false;
   /// Last `roomAlias` from a checkCamera or state payload.
   std::string check_camera_last_room_alias;
+  std::vector<LayoutOffsetRow> layout_tronic_offsets;
+  std::vector<LayoutCameraRow> layout_camera_rows;
+  std::vector<LayoutRoomModifierRow> layout_room_modifiers;
+  LayoutRoomModifierRow layout_global_modifier;
+  int layout_revision = 0;
+  std::string layout_wire_cache;
 
   void printState() const {
     printf("Lobby: %s, Started: %s, Time: %d\n", lobbyId.c_str(),

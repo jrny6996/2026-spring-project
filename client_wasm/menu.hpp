@@ -22,25 +22,26 @@ class Menu : public Scene {
   bool loaded_resources = false;
   int warmup_frame_gate_ = 0;
 
+  // All menu copy is centred on the screen; callers only pick the baseline.
+  void draw_text_centered(const char* text, int y, int font, Color color) {
+    DrawText(text, GetScreenWidth() / 2 - MeasureText(text, font) / 2, y, font,
+             color);
+  }
+
   void draw_asset_loading_screen(float progress) {
     const int pct = static_cast<int>(progress * 100.0f);
     BeginDrawing();
     ClearBackground(BLACK);
 
-    const char* title = "Preparing assets";
-    DrawText(title, GetScreenWidth() / 2 - MeasureText(title, 44) / 2,
-             GetScreenHeight() / 2 - 78, 44, LIGHTGRAY);
+    draw_text_centered("Preparing assets", GetScreenHeight() / 2 - 78, 44,
+                       LIGHTGRAY);
 
     char progress_line[96];
     std::snprintf(progress_line, sizeof(progress_line), "%d%%", pct);
-    DrawText(progress_line,
-             GetScreenWidth() / 2 - MeasureText(progress_line, 40) / 2,
-             GetScreenHeight() / 2 - 12, 40, ORANGE);
+    draw_text_centered(progress_line, GetScreenHeight() / 2 - 12, 40, ORANGE);
 
-    DrawText("Loading 3D models into memory...",
-             GetScreenWidth() / 2 -
-                 MeasureText("Loading 3D models into memory...", 20) / 2,
-             GetScreenHeight() / 2 + 40, 20, Fade(SKYBLUE, 0.95f));
+    draw_text_centered("Loading 3D models into memory...",
+                       GetScreenHeight() / 2 + 40, 20, Fade(SKYBLUE, 0.95f));
     EndDrawing();
   }
 
@@ -77,7 +78,8 @@ class Menu : public Scene {
     const char* display = join_lobby_input.empty() ? "Enter Lobby ID..."
                                                    : join_lobby_input.c_str();
 
-    DrawText(display, x + 10, y + 12, 20, LIGHTGRAY);
+    DrawText(display, center_x - MeasureText(display, 20) / 2, y + 12, 20,
+             LIGHTGRAY);
   }
 
   void compute_layout(const char* title, const char* btntext, int& title_x,
@@ -138,10 +140,7 @@ class Menu : public Scene {
     DrawRectangle(x - padding, offset_y - padding, width + padding * 2,
                   start_font + padding * 2, GRAY);
 
-    DrawText(
-        "JOIN LOBBY",
-        (GetScreenWidth() / 2) - (MeasureText("JOIN LOBBY", start_font) / 2),
-        offset_y, start_font, LIGHTGRAY);
+    DrawText("JOIN LOBBY", x, offset_y, start_font, LIGHTGRAY);
   }
 
   void draw_cursor(Vector2 mouse_pos) {
@@ -192,10 +191,8 @@ class Menu : public Scene {
       ShowCursor();
       BeginDrawing();
       ClearBackground(BLACK);
-      const char* msg = "loading assets";
-      int tw = MeasureText(msg, 36);
-      DrawText(msg, GetScreenWidth() / 2 - tw / 2,
-               GetScreenHeight() / 2 - 18, 36, LIGHTGRAY);
+      draw_text_centered("loading assets", GetScreenHeight() / 2 - 18, 36,
+                         LIGHTGRAY);
       EndDrawing();
 
       main_scene = new MainScene(camera);
@@ -243,19 +240,22 @@ class Menu : public Scene {
       draw_create_button(btntext, btn_x, btn_y, btn_width);
 
       draw_join_text_input(GetScreenWidth() / 2, btn_y + 140);
-      draw_join_button(btn_x, btn_y, btn_width);
+
+      int join_width = MeasureText("JOIN LOBBY", start_font);
+      int join_x = (GetScreenWidth() / 2) - (join_width / 2);
+      draw_join_button(join_x, btn_y, join_width);
 
       if (!state.menu_error.empty()) {
-        DrawText(state.menu_error.c_str(), title_x, btn_y + 210, 18, MAROON);
+        draw_text_centered(state.menu_error.c_str(), btn_y + 210, 18, MAROON);
       }
 
-      DrawText("Join an existing lobby with the id above.", title_x,
-               btn_y + 240, 16, Fade(GRAY, 0.9f));
+      draw_text_centered("Join an existing lobby with the id above.",
+                         btn_y + 240, 16, Fade(GRAY, 0.9f));
 
       bool hovering_create =
           is_hovering(mouse_pos, btn_x, btn_y, btn_width, start_font);
       bool hovering_join =
-          is_hovering(mouse_pos, btn_x, btn_y + 72, btn_width, start_font);
+          is_hovering(mouse_pos, join_x, btn_y + 72, join_width, start_font);
 
       if (!state.menu_creating_lobby && (hovering_create || hovering_join)) {
         SetMouseCursor(MOUSE_CURSOR_POINTING_HAND);
@@ -281,25 +281,24 @@ class Menu : public Scene {
 
       draw_title(title, title_x, title_y);
       int ry = title_y + 32;
-      DrawText(role_line, title_x, ry, 18, SKYBLUE);
+      draw_text_centered(role_line, ry, 18, SKYBLUE);
       ry += 28;
 
       if (state.is_lobby_host) {
         const char* start_txt = "Press SPACE to start (both players ready)";
-        int sx = GetScreenWidth() / 2 - MeasureText(start_txt, start_font) / 2;
-        draw_create_button(start_txt, sx, btn_y + 24,
-                             MeasureText(start_txt, start_font));
+        int start_width = MeasureText(start_txt, start_font);
+        int sx = (GetScreenWidth() / 2) - (start_width / 2);
+        draw_create_button(start_txt, sx, btn_y + 24, start_width);
         if (IsKeyPressed(KEY_SPACE)) {
           ws::send_start(socket);
         }
       } else {
-        const char* wait_txt = "Waiting for host to start the game…";
-        int wx = GetScreenWidth() / 2 - MeasureText(wait_txt, 22) / 2;
-        DrawText(wait_txt, wx, btn_y + 40, 22, LIGHTGRAY);
+        draw_text_centered("Waiting for host to start the game…",
+                           btn_y + 40, 22, LIGHTGRAY);
       }
 
       if (!state.menu_error.empty()) {
-        DrawText(state.menu_error.c_str(), title_x, btn_y + 120, 18, MAROON);
+        draw_text_centered(state.menu_error.c_str(), btn_y + 120, 18, MAROON);
       }
 
       SetMouseCursor(MOUSE_CURSOR_DEFAULT);

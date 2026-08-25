@@ -35,6 +35,28 @@ EM_JS(char*, wasm_alloc_ws_url, (), {
   return p;
 });
 
+// raylib 5.5's InitWindow() ignores InitPlatform()'s return value: if glfwCreateWindow() cannot
+// get a WebGL 2 context it still runs rlglInit(), which calls glBindTexture on an undefined
+// GL object ("Cannot read properties of undefined (reading 'bindTexture')"). Check first so the
+// failure is reported instead of crashing. The shipped shells preflight this too; this guard
+// covers builds that use Emscripten's default shell.
+EM_JS(int, wasm_has_webgl2, (), {
+  try {
+    var probe = document.createElement("canvas");
+    probe.width = 1;
+    probe.height = 1;
+    var gl = probe.getContext("webgl2", {alpha : true, depth : true, stencil : true, antialias : false});
+    if (!gl)
+      return 0;
+    var lose = gl.getExtension("WEBGL_lose_context");
+    if (lose)
+      lose.loseContext();
+    return 1;
+  } catch (e) {
+    return 0;
+  }
+});
+
 // #include <jet/live.hpp>
 //   jet::Live live;
 
@@ -71,6 +93,14 @@ int main(void) {
   char* ws_url = wasm_alloc_ws_url();
   socket = ws::init(ws_url, &ctx);
   free(ws_url);
+
+  if (!wasm_has_webgl2()) {
+    printf(
+        "FATAL: no WebGL 2 context available - the client needs WebGL 2 "
+        "(OpenGL ES 3.0). Enable graphics acceleration, close other 3D tabs, "
+        "check chrome://gpu, then reload.\n");
+    return 1;
+  }
 
   InitWindow(screenWidth, screenHeight, "raylib [core] game - world screen");
 

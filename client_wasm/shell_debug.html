@@ -82,6 +82,43 @@
       word-break: break-word;
       box-shadow: 0 8px 20px rgba(0,0,0,.4);
     }
+
+    #gl-error {
+      position: absolute;
+      inset: 0;
+      z-index: 60;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.92);
+      color: #f5f5f5;
+      padding: 24px;
+      text-align: center;
+    }
+
+    #gl-error-inner {
+      max-width: 640px;
+    }
+
+    #gl-error-title {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+
+    #gl-error-detail {
+      font-size: 14px;
+      line-height: 1.5;
+      color: #d0d0d0;
+      white-space: pre-wrap;
+    }
+
+    #gl-error-hint {
+      margin-top: 14px;
+      font-size: 13px;
+      line-height: 1.5;
+      color: #9fb8cc;
+    }
   </style>
 </head>
 <body>
@@ -92,6 +129,15 @@
       <button id="fs-audio-btn" class="ctrl-btn" type="button">Fullscreen + Audio</button>
     </div>
     <pre id="debug-terminal">[debug shell] ready\n</pre>
+    <div id="gl-error">
+      <div id="gl-error-inner">
+        <div id="gl-error-title"></div>
+        <div id="gl-error-detail"></div>
+        <div id="gl-error-hint">Try: reload the page, close other tabs using 3D/WebGL, check
+          chrome://gpu, and make sure "Use graphics acceleration when available" is on in
+          browser settings. On Linux a GPU-process restart (or browser restart) usually clears this.</div>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -137,6 +183,69 @@
     Module.canvas = (function() {
       return document.getElementById("canvas");
     })();
+
+    // WebGL 2 preflight.
+    // raylib 5.5's InitWindow() ignores InitPlatform()'s return value: when glfwCreateWindow()
+    // fails it still calls rlglInit(), so a missing context surfaces as
+    // "Cannot read properties of undefined (reading 'bindTexture')" instead of a usable message.
+    // Check for the context up front and keep main() from running without one.
+    function showGlError(title, detail) {
+      var box = document.getElementById("gl-error");
+      if (!box) return;
+      document.getElementById("gl-error-title").textContent = title;
+      document.getElementById("gl-error-detail").textContent = detail;
+      box.style.display = "flex";
+    }
+
+    (function installContextListeners() {
+      var canvas = document.getElementById("canvas");
+      if (!canvas) return;
+      canvas.addEventListener("webglcontextcreationerror", function(e) {
+        showGlError("WebGL 2 context could not be created",
+                    e.statusMessage || "The browser gave no reason.");
+      }, false);
+      canvas.addEventListener("webglcontextlost", function(e) {
+        e.preventDefault();
+        showGlError("WebGL context lost",
+                    "The GPU dropped this page's context. Reload to restart the game.");
+      }, false);
+    })();
+
+    function probeWebGL2() {
+      var probe = document.createElement("canvas");
+      probe.width = 1;
+      probe.height = 1;
+      var gl = null;
+      try {
+        gl = probe.getContext("webgl2", {alpha: true, depth: true, stencil: true, antialias: false});
+      } catch (err) {
+        return {ok: false, detail: "getContext('webgl2') threw: " + err};
+      }
+      if (!gl) {
+        var hasWebGL1 = false;
+        try {
+          hasWebGL1 = !!probe.getContext("webgl");
+        } catch (err2) {}
+        return {
+          ok: false,
+          detail: hasWebGL1
+              ? "This browser has WebGL 1 but not WebGL 2. The client is built for WebGL 2 (OpenGL ES 3.0) and cannot fall back."
+              : "This browser reports no WebGL at all, so hardware acceleration is off, blocklisted, or the GPU process is wedged."
+        };
+      }
+      // Browsers cap simultaneous WebGL contexts - hand this one back before raylib asks for its own.
+      var lose = gl.getExtension("WEBGL_lose_context");
+      if (lose) lose.loseContext();
+      return {ok: true};
+    }
+
+    var glPreflight = probeWebGL2();
+    if (!glPreflight.ok) {
+      // Runtime still initializes (harmless), but main() -> InitWindow() -> rlglInit() never runs.
+      Module.noInitialRun = true;
+      console.error("WebGL 2 preflight failed: " + glPreflight.detail);
+      showGlError("WebGL 2 is not available", glPreflight.detail);
+    }
 
     function fitCanvasToViewport() {
       var app = document.getElementById("app");

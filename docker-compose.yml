@@ -1,5 +1,3 @@
-# Local URL: http://localhost:6789 — bare http://fnaf-app:6789/ fails unless /etc/hosts has
-# "127.0.0.1 fnaf-app". Or use http://fnaf-app.localhost:6789/ (resolves on macOS without hosts).
 services:
   app:
     build:
